@@ -1,3 +1,34 @@
-# Workspace, Unity Catalog, Lakebase, and App grants are added after resources exist.
-resources: {}
+# Least-privilege grants for Story Engine bundle resources.
+# See docs/adr/001-deployment-identities.md for the identity model this implements.
+#
+# Grants are intentionally NOT wired to the `app`/`generation_job` resources yet:
+# those permission blocks are added once resources/app.yml and resources/jobs.yml
+# define real Databricks App / Job resources (Task 4G.1 / 3F.1), because `databricks
+# bundle validate` rejects permission blocks that reference undefined resources.
+# Until then this file documents the intended grants so reviewers can check the
+# design against ADR 001 before the resources exist.
+#
+# Intended grants once resources exist:
+#   - resources.apps.story_engine_app:
+#       permissions:
+#         - service_principal_name: ${var.ci_deployer_sp_application_id}
+#           level: CAN_MANAGE
+#         # App runtime uses its own Databricks-managed service principal (created
+#         # automatically when the App resource is deployed) — it is never granted
+#         # CAN_MANAGE on itself or on other resources.
+#   - resources.jobs.generation_job / report_job / audit_export_job / quality_check_job:
+#       permissions:
+#         - service_principal_name: ${var.ci_deployer_sp_application_id}
+#           level: CAN_MANAGE
+#         - service_principal_name: ${var.job_runtime_sp_application_id}
+#           level: CAN_MANAGE_RUN
+#
+# Lakebase/Postgres role grants (non-owner app/job/migration roles, RLS policies)
+# are defined in migrations/0006_rls_and_roles.sql, not here — Databricks bundle
+# permissions only cover workspace-object ACLs, not in-database privileges.
+#
+# Unity Catalog grants (catalog/schema/volume access for the audit-export job
+# identity only; the app/API runtime never gets direct UC write access) are
+# applied via notebooks/00_platform_setup.py during Task 1B.1.
 
+resources: {}

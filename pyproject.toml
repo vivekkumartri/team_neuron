@@ -22,10 +22,15 @@ dependencies = [
 dev = [
   "pytest>=8.3,<9.0",
   "pytest-asyncio>=0.24,<1.0",
+  "httpx>=0.27,<1.0",
   "ruff>=0.6,<1.0",
   "mypy>=1.11,<2.0",
   "build>=1.2,<2.0",
 ]
+
+[project.entry-points.packages]
+run_generation_job = "story_engine.workers.generation_job:main"
+run_report_job = "story_engine.workers.report_job:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -41,7 +46,24 @@ target-version = "py311"
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
 
+[tool.ruff.lint.per-file-ignores]
+# Databricks notebooks receive `dbutils` as an injected runtime global.
+"notebooks/*.py" = ["F821"]
+# Integration/unit test fixtures favor one readable inline SQL/assertion
+# string over an arbitrarily wrapped one; long lines here aren't a code smell.
+"tests/integration/persistence/*.py" = ["E501"]
+"tests/integration/workers/*.py" = ["E501"]
+"tests/security/*.py" = ["E501"]
+"tests/unit/agents/test_canon_events.py" = ["E501"]
+
 [tool.mypy]
 python_version = "3.11"
 strict = true
 packages = ["story_engine"]
+
+[[tool.mypy.overrides]]
+# PySpark is a Databricks-runtime-provided dependency, not installed for
+# local/CI unit testing; export_generation_audit.py only imports it under
+# TYPE_CHECKING so this override only affects type-checking, not runtime.
+module = "pyspark.*"
+ignore_missing_imports = true

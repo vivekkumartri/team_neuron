@@ -11,7 +11,15 @@ from sse_starlette.sse import EventSourceResponse
 from starlette.responses import Response
 
 from story_engine.api.events import event_stream
+from story_engine.api.routes.branches import router as branches_router
+from story_engine.api.routes.chapters import router as chapters_router
+from story_engine.api.routes.endings import router as endings_router
+from story_engine.api.routes.events import router as events_router
+from story_engine.api.routes.preferences import router as preferences_router
+from story_engine.api.routes.revisions import router as revisions_router
 from story_engine.api.routes.stories import router as stories_router
+from story_engine.api.routes.traces import router as traces_router
+from story_engine.api.routes.world import router as world_router
 from story_engine.api.settings import load_settings
 from story_engine.domain.events import ClientGenerationEvent, PublicAgentLabel
 from story_engine.domain.models import ChapterStatus
@@ -31,6 +39,14 @@ class SPAStaticFiles(StaticFiles):
 def create_app() -> FastAPI:
     app = FastAPI(title="Story Engine", version="0.1.0")
     app.include_router(stories_router)
+    app.include_router(branches_router)
+    app.include_router(chapters_router)
+    app.include_router(events_router)
+    app.include_router(preferences_router)
+    app.include_router(traces_router)
+    app.include_router(world_router)
+    app.include_router(endings_router)
+    app.include_router(revisions_router)
 
     @app.get("/api/v1/health", include_in_schema=False)
     def health() -> JSONResponse:

@@ -1,3 +1,38 @@
-# Generation, reporting, audit, and quality-check jobs are added in Phase 3 and Phase 5.
-resources: {}
+# Generation and reporting jobs (Task 3F.1). Both run the wheel task defined
+# by `artifacts.story_engine_wheel` in databricks.yml; parameters are limited
+# to a tenant-safe identifier per design.md's "pass only job_id/tenant-safe
+# identifiers as parameters" rule. Audit-export and quality-check jobs are
+# added alongside Task 3F.3 / 5I.2.
+resources:
+  jobs:
+    generation_job:
+      name: story-engine-generation-${bundle.target}
+      tasks:
+        - task_key: run_generation
+          python_wheel_task:
+            package_name: story_engine
+            entry_point: run_generation_job
+            named_parameters:
+              job-id: "{{job.parameters.job_id}}"
+          libraries:
+            - whl: ../dist/*.whl
+      parameters:
+        - name: job_id
+          default: ""
+      max_concurrent_runs: 1
 
+    report_job:
+      name: story-engine-report-${bundle.target}
+      tasks:
+        - task_key: run_report
+          python_wheel_task:
+            package_name: story_engine
+            entry_point: run_report_job
+            named_parameters:
+              chapter-id: "{{job.parameters.chapter_id}}"
+          libraries:
+            - whl: ../dist/*.whl
+      parameters:
+        - name: chapter_id
+          default: ""
+      max_concurrent_runs: 4

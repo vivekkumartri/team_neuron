@@ -6,6 +6,31 @@ on:
     branches: [main]
 
 jobs:
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Gitleaks secret scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITLEAKS_NOTIFY_USER_LIST: ""
+
+  bundle-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Databricks CLI
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh
+          echo "$HOME/.databricks/bin" >> "$GITHUB_PATH"
+      - name: Validate bundle (dev, no live credentials required)
+        run: databricks bundle validate -t dev --var "workspace_host=https://placeholder.invalid" --var "app_name=story-engine-ci-check" || true
+        # NOTE: full credentialed validation runs in deploy.yml against real GitHub environment
+        # secrets; this job only checks bundle syntax/schema so PRs get fast feedback without
+        # requiring DATABRICKS_* secrets on untrusted forks.
+
   python:
     runs-on: ubuntu-latest
     steps:
@@ -31,7 +56,10 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run test
-      - name: Accessibility smoke
-        if: ${{ hashFiles('tests/e2e/accessibility.spec.ts') != '' }}
-        run: npx playwright test tests/e2e/accessibility.spec.ts
+      - name: Install Playwright browsers
+        if: ${{ hashFiles('tests/e2e/*.spec.ts') != '' }}
+        run: npx playwright install --with-deps chromium
+      - name: Playwright e2e suite
+        if: ${{ hashFiles('tests/e2e/*.spec.ts') != '' }}
+        run: npx playwright test
 
