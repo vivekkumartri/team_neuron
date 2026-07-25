@@ -8,13 +8,36 @@ tokens are intentionally never persisted or returned by an API.
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterator
+from contextlib import contextmanager
 
 from databricks.sdk import WorkspaceClient
-from psycopg import connect
+from psycopg import Connection, connect
 
 from story_engine.api.settings import RuntimeSettings
 
 logger = logging.getLogger(__name__)
+
+
+@contextmanager
+def lakebase_connection(settings: RuntimeSettings) -> Iterator[Connection[object]]:
+    """Open one OAuth-authenticated Lakebase connection without persisting tokens."""
+
+    if not settings.database_resource_bound:
+        raise RuntimeError("Lakebase resource is not bound")
+    credential = WorkspaceClient().postgres.generate_database_credential(
+        endpoint=settings.database_endpoint or ""
+    )
+    with connect(
+        dbname=settings.database_name,
+        user=settings.database_user,
+        host=settings.database_host,
+        port="5432",
+        sslmode="require",
+        password=credential.token,
+        connect_timeout=5,
+    ) as connection:
+        yield connection
 
 
 def lakebase_is_ready(settings: RuntimeSettings) -> bool:
@@ -24,18 +47,7 @@ def lakebase_is_ready(settings: RuntimeSettings) -> bool:
         return False
 
     try:
-        credential = WorkspaceClient().postgres.generate_database_credential(
-            endpoint=settings.database_endpoint or ""
-        )
-        with connect(
-            dbname=settings.database_name,
-            user=settings.database_user,
-            host=settings.database_host,
-            port="5432",
-            sslmode="require",
-            password=credential.token,
-            connect_timeout=5,
-        ) as connection:
+        with lakebase_connection(settings) as connection:
             with connection.cursor() as cursor:
                 cursor.execute("SELECT 1")
                 return cursor.fetchone() == (1,)

@@ -325,7 +325,7 @@ The full decision record is maintained in `requirements-reconciliation.md`. Any 
   - **Details:** Define the App entry point, health/readiness endpoints, resource bindings, static asset directory, and production security headers. Build the Next.js client before App packaging, serve its static export, and return the SPA shell for non-`/api/*` client routes. Do not store credentials in `app.yaml`; use Lakebase/App resource injection.
   - **Verification:** Deploy App to `dev`; App URL returns health `200`, serves the placeholder SPA shell before Track H is complete, resolves a client-side deep link to the shell, and fails readiness when the database binding is intentionally unavailable.
 
-- [ ] **Task 4G.2: Implement authenticated REST APIs**
+- [/] **Task 4G.2: Implement authenticated REST APIs**
   - **Tooling:** FastAPI, Pydantic, Lakebase.
   - **Target Files:** `src/story_engine/api/auth.py`, `src/story_engine/api/routes/stories.py`, `branches.py`, `chapters.py`, `world.py`, `preferences.py`, `traces.py`, `tests/contract/test_rest_contract.py`.
   - **Details:** Implement the APIs in `design.md`, including Databricks App identity validation, just-in-time user provisioning on the first authenticated request, idempotency headers, ETags/version conflicts, authorization, personalization snapshots, canon-event requests, job-dispatch submission, and trace flag controls. Use API DTOs that exclude private data by construction.
