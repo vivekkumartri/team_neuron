@@ -8,11 +8,22 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sse_starlette.sse import EventSourceResponse
+from starlette.responses import Response
 
 from story_engine.api.events import event_stream
 from story_engine.api.settings import load_settings
 from story_engine.domain.events import ClientGenerationEvent, PublicAgentLabel
 from story_engine.domain.models import ChapterStatus
+
+
+class SPAStaticFiles(StaticFiles):
+    """Serve the static application shell for browser deep links."""
+
+    async def get_response(self, path: str, scope: object) -> Response:
+        response = await super().get_response(path, scope)  # type: ignore[arg-type]
+        if response.status_code == 404 and "." not in path:
+            return await super().get_response("index.html", scope)  # type: ignore[arg-type]
+        return response
 
 
 def create_app() -> FastAPI:
@@ -28,6 +39,13 @@ def create_app() -> FastAPI:
                 "lakebase_resource_bound": settings.database_resource_bound,
             }
         )
+
+    @app.get("/api/v1/readiness", include_in_schema=False)
+    def readiness() -> JSONResponse:
+        settings = load_settings()
+        if not settings.database_resource_bound:
+            return JSONResponse({"status": "unavailable"}, status_code=503)
+        return JSONResponse({"status": "ready"})
 
     @app.get("/api/v1/generation-events/demo", include_in_schema=False)
     async def demo_generation_events() -> EventSourceResponse:
@@ -51,7 +69,7 @@ def create_app() -> FastAPI:
 
     static_dir = Path(__file__).resolve().parents[2] / "web" / "out"
     if static_dir.is_dir():
-        app.mount("/", StaticFiles(directory=static_dir, html=True), name="studio")
+        app.mount("/", SPAStaticFiles(directory=static_dir, html=True), name="studio")
 
     return app
 
