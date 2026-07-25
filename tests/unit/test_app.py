@@ -11,7 +11,9 @@ def test_health_endpoint_does_not_expose_connection_values(monkeypatch: Any) -> 
     monkeypatch.setenv("PGUSER", "runtime-identity")  # type: ignore[attr-defined]
     monkeypatch.setenv("ENDPOINT_NAME", "projects/example/branches/dev/endpoints/primary")  # type: ignore[attr-defined]
 
-    route = next(route for route in create_app().routes if route.path == "/api/v1/health")
+    route = next(
+        route for route in create_app().routes if getattr(route, "path", None) == "/api/v1/health"
+    )
     response = route.endpoint()  # type: ignore[union-attr]
 
     assert response.status_code == 200
@@ -27,7 +29,11 @@ def test_readiness_requires_a_successful_database_query(monkeypatch: Any) -> Non
     monkeypatch.setenv("ENDPOINT_NAME", "projects/example/branches/dev/endpoints/primary")  # type: ignore[attr-defined]
     monkeypatch.setattr("story_engine.app.lakebase_is_ready", lambda _settings: False)
 
-    route = next(route for route in create_app().routes if route.path == "/api/v1/readiness")
+    route = next(
+        route
+        for route in create_app().routes
+        if getattr(route, "path", None) == "/api/v1/readiness"
+    )
     response = route.endpoint()  # type: ignore[union-attr]
 
     assert response.status_code == 503
