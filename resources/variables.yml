@@ -12,10 +12,10 @@ variables:
     description: Unity Catalog schema name for the selected environment.
     default: app
   lakebase_project:
-    description: Lakebase project resource ID; supplied per target after provisioning.
+    description: Lakebase Autoscaling branch ID; supplied per target after provisioning.
     default: ""
   lakebase_database:
-    description: Lakebase database resource ID; supplied per target after provisioning.
+    description: Lakebase database name; supplied per target after provisioning.
     default: ""
   lakebase_endpoint:
     description: Lakebase read-write endpoint resource ID used for OAuth credential rotation.

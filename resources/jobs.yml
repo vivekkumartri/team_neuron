@@ -47,18 +47,83 @@ resources:
           default: ""
       max_concurrent_runs: 4
 
+    memory_compaction_job:
+      # Task 3F.1 gap closure: compacts `character_memories` EPISODIC rows for
+      # one branch (see src/story_engine/workers/memory_compaction.py). Runs
+      # nightly across all branches would need a fan-out driver this task
+      # doesn't add; today it's parameterized per-branch, triggered the same
+      # way generation_job/report_job are (a caller passes one branch_id).
+      name: story-engine-memory-compaction-${bundle.target}
+      environments:
+        - environment_key: serverless
+          spec:
+            environment_version: "4"
+            dependencies:
+              - ../dist/*.whl
+      tasks:
+        - task_key: run_memory_compaction
+          environment_key: serverless
+          python_wheel_task:
+            package_name: story_engine
+            entry_point: run_memory_compaction_job
+            named_parameters:
+              branch-id: "{{job.parameters.branch_id}}"
+      parameters:
+        - name: branch_id
+          default: ""
+      max_concurrent_runs: 4
+
+    audit_export_job:
+      # Task 3F.1/3F.3 gap closure: incremental redacted export to Delta
+      # (src/story_engine/analytics/export_generation_audit.py). Scheduled
+      # daily like quality_checks_job since it's a batch reconciliation-style
+      # job, not a per-request one — source/target table names are config,
+      # not tenant-identifying parameters.
+      name: story-engine-audit-export-${bundle.target}
+      schedule:
+        quartz_cron_expression: "0 30 5 * * ?" # Daily at 05:30 UTC, ahead of quality checks
+        timezone_id: UTC
+        pause_status: ${var.quality_checks_schedule_paused}
+      environments:
+        - environment_key: serverless
+          spec:
+            environment_version: "4"
+            dependencies:
+              - ../dist/*.whl
+      tasks:
+        - task_key: run_audit_export
+          environment_key: serverless
+          python_wheel_task:
+            package_name: story_engine
+            entry_point: run_audit_export_job
+            named_parameters:
+              source-table: "{{job.parameters.source_table}}"
+              target-table: "{{job.parameters.target_table}}"
+      parameters:
+        - name: source_table
+          default: "main.story_engine.generation_jobs_redacted_source"
+        - name: target_table
+          default: "main.story_engine.generation_audit"
+      max_concurrent_runs: 1
+
     quality_checks_job:
       # Task 5I.2: scheduled reconciliation checks. Runs the notebook wrapper
-      # directly (not a wheel task) since notebooks/03_operational_quality_checks.py
-      # is already a plain Databricks notebook — no additional wheel
-      # packaging is needed for this one.
+      # directly (not a wheel task). The notebook imports `story_engine`, so
+      # its serverless environment still installs the bundle wheel below.
       name: story-engine-quality-checks-${bundle.target}
       schedule:
         quartz_cron_expression: "0 0 6 * * ?" # Daily at 06:00
         timezone_id: UTC
         pause_status: ${var.quality_checks_schedule_paused}
+      environments:
+        - environment_key: serverless
+          spec:
+            environment_version: "4"
+            dependencies:
+              - ../dist/*.whl
       tasks:
         - task_key: run_quality_checks
+          environment_key: serverless
           notebook_task:
             notebook_path: ../notebooks/03_operational_quality_checks.py
       max_concurrent_runs: 1

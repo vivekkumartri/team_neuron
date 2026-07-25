@@ -19,6 +19,30 @@ targets:
   dev:
     mode: development
     default: true
+    variables:
+      # Lakebase Autoscaling resources selected in the development project.
+      # These are resource identifiers, not database credentials.
+      # The apps.postgres resource field expects the project *name*, not its
+      # UUID, and the branch *display name* ("dev"), not its UID — both
+      # confirmed by reading back the last known-working deployed app's own
+      # resource binding via `databricks apps get` earlier: it showed
+      # "branch": "projects/story-engine/branches/dev". The database segment
+      # is the one genuinely easy-to-miss part: the Lakebase console displays
+      # the Postgres database name with an underscore ("databricks_postgres"),
+      # but that same `apps get` output showed the resource-path slug uses a
+      # HYPHEN instead ("databricks-postgres") — two prior edits here used
+      # the underscore form and a branch UID, both of which 404'd. This is
+      # the exact string that was live and working before any edits today.
+      lakebase_project: projects/story-engine/branches/dev
+      lakebase_database: projects/story-engine/branches/dev/databases/databricks-postgres
+      # Same lesson as lakebase_project's fix above, one segment later:
+      # `ep-wispy-meadow-d8t7wej0` is the endpoint's `uid`, not its resource
+      # name — confirmed live via `databricks postgres list-endpoints
+      # projects/story-engine/branches/dev`, which showed `endpoint_id:
+      # "primary"` and `name: "projects/story-engine/branches/dev/endpoints/
+      # primary"` for that same uid. `generate-database-credential` 404'd
+      # with the uid-as-name form and succeeded with this one.
+      lakebase_endpoint: projects/story-engine/branches/dev/endpoints/primary
     workspace:
       # DAB authentication cannot resolve a custom ${var.*} host value.
       # This workspace URL is non-secret; credentials remain in the CLI profile.

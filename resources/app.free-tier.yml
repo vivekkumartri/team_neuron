@@ -1,0 +1,28 @@
+# Databricks Free Edition deploy variant of resources/app.yml.
+#
+# Free Edition workspaces cannot provision Lakebase (managed Postgres), so
+# this file omits the `resources: [postgres]` block entirely rather than
+# pointing it at a resource that doesn't exist. `app.py`'s
+# `lakebase_is_ready()` already fails closed (returns False, never raises)
+# when `settings.database_resource_bound` is false, so the app boots and
+# serves `/api/v1/health` correctly; `/api/v1/readiness` reports
+# `{"status": "unavailable"}` and every Lakebase-backed route (stories,
+# branches, chapters, etc.) will 503 until a real Lakebase-capable workspace
+# is used instead. This is a deliberate, documented reduction in scope for a
+# Free Edition smoke-test deploy — not the target production configuration.
+#
+# Deploy with this file instead of resources/app.yml by temporarily renaming
+# it (or by excluding resources/app.yml from `include:` in databricks.yml for
+# this one deploy) since `include: [resources/*.yml]` would otherwise pick up
+# both and collide on the same app resource name.
+resources:
+  apps:
+    story_engine:
+      name: ${var.app_name}
+      description: Story Engine FastAPI and static web application (Free Edition — no Lakebase).
+      source_code_path: .
+      config:
+        command:
+          - bash
+          - -lc
+          - PYTHONPATH=src python -m uvicorn story_engine.app:app --host 0.0.0.0 --port 8000

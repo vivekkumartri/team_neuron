@@ -12,6 +12,12 @@ dependencies = [
   "uvicorn[standard]>=0.30,<1.0",
   "pydantic>=2.8,<3.0",
   "sqlalchemy>=2.0,<3.0",
+  # [binary] bundles a prebuilt libpq so the Databricks App container (which
+  # has no system libpq) doesn't crash at import time with "no pq wrapper
+  # available" — confirmed live: the App crashed at startup with exactly
+  # that ImportError when this was bare "psycopg" (requirements.txt already
+  # had [binary], but the App builds from this file's wheel metadata, not
+  # requirements.txt, so the two had drifted out of sync).
   "psycopg[binary]>=3.2,<4.0",
   "psycopg-pool>=3.2,<4.0",
   "databricks-sdk>=0.89,<1.0",
@@ -31,6 +37,8 @@ dev = [
 [project.entry-points.packages]
 run_generation_job = "story_engine.workers.generation_job:main"
 run_report_job = "story_engine.workers.report_job:main"
+run_memory_compaction_job = "story_engine.workers.memory_compaction:main"
+run_audit_export_job = "story_engine.analytics.export_generation_audit:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
