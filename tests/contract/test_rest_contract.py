@@ -76,6 +76,23 @@ def test_revision_request_requires_auth() -> None:
     assert response.status_code == 401
 
 
+def test_my_quota_requires_auth() -> None:
+    response = client.get("/api/v1/me/quota")
+    assert response.status_code == 401
+
+
+def test_quota_state_response_schema_matches_quota_banner_shape() -> None:
+    """`QuotaStateResponse` must carry every field
+    `web/components/features/workspace/QuotaBanner.tsx`'s `QuotaBannerState`
+    interface expects, so the frontend banner has a real data source.
+    """
+
+    schema = client.get("/openapi.json").json()
+    quota_schema = schema["components"]["schemas"]["QuotaStateResponse"]["properties"]
+    for field in ("category", "used", "limit", "remaining", "exceeded", "approaching"):
+        assert field in quota_schema, f"QuotaStateResponse must expose {field!r}"
+
+
 def test_revision_request_schema_rejects_unknown_fields() -> None:
     schema = client.get("/openapi.json").json()
     request_schema = schema["components"]["schemas"]["RevisionRequestInput"]
