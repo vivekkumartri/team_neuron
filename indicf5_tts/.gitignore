@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+samples/*.wav
+outputs/*.wav
+ref_uploads/*.wav
+server.log
+ngrok.log
+.server.pid
+.DS_Store
+
+# Model checkpoint is large (~1.3GB) — kept locally, not committed to git.
+# Re-download anytime via setup.sh / huggingface_hub (see README "Model checkpoint" section).
+model_checkpoint/*.safetensors
