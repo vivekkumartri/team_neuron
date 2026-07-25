@@ -11,6 +11,7 @@ from typing import Annotated, Any, cast
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
+from psycopg.types.json import Jsonb
 from pydantic import BaseModel, ConfigDict, Field
 
 from story_engine.api.auth import AuthenticatedUser, authenticate_request, tenant_connection
@@ -82,7 +83,9 @@ def upsert_preference(payload: PreferenceInput, user: CurrentUser) -> Preference
                 "  consented_at = now(), "
                 "  revoked_at = NULL "
                 "RETURNING id, preference_key, preference_value, source, consented_at, revoked_at",
-                (user.id, payload.preference_key, payload.preference_value, payload.source),
+                # Jsonb ensures scalars such as booleans, strings, and numbers
+                # are adapted as JSON rather than native PostgreSQL types.
+                (user.id, payload.preference_key, Jsonb(payload.preference_value), payload.source),
             )
             row = cursor.fetchone()
         connection.commit()
@@ -143,7 +146,7 @@ def create_personalization_snapshot(user: CurrentUser) -> SnapshotResponse:
             cursor.execute(
                 "INSERT INTO personalization_snapshots (user_id, snapshot_version, preferences) "
                 "VALUES (%s, %s, %s) RETURNING id, snapshot_version",
-                (user.id, next_version, preferences),
+                (user.id, next_version, Jsonb(preferences)),
             )
             row = cursor.fetchone()
         connection.commit()
