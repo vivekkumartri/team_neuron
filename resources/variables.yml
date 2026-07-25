@@ -17,6 +17,9 @@ variables:
   lakebase_database:
     description: Lakebase database resource ID; supplied per target after provisioning.
     default: ""
+  lakebase_endpoint:
+    description: Lakebase read-write endpoint resource ID used for OAuth credential rotation.
+    default: ""
   volume_name:
     description: Unity Catalog Volume name for approved artifacts.
     default: artifacts

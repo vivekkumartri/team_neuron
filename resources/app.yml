@@ -4,4 +4,20 @@ resources:
       name: ${var.app_name}
       description: Story Engine FastAPI and static web application.
       source_code_path: .
-
+      config:
+        command:
+          - bash
+          - -lc
+          - PYTHONPATH=src python -m uvicorn story_engine.app:app --host 0.0.0.0 --port 8000
+        env:
+          - name: ENDPOINT_NAME
+            value: ${var.lakebase_endpoint}
+      # Lakebase Autoscaling resource. Databricks creates a scoped App service
+      # principal role and injects PG* connection metadata at runtime; neither
+      # a database password nor a connection URL belongs in source control.
+      resources:
+        - name: postgres
+          postgres:
+            branch: ${var.lakebase_project}
+            database: ${var.lakebase_database}
+            permission: CAN_CONNECT_AND_CREATE

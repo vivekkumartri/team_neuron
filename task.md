@@ -185,31 +185,31 @@ The full decision record is maintained in `requirements-reconciliation.md`. Any 
 
 *Target isolation: `migrations/`, `src/story_engine/persistence/`, and `tests/integration/persistence/` only.*
 
-- [ ] **Task 2C.1: Create tenant, story, personalization schema, and migration runner**
+- [/] **Task 2C.1: Create tenant, story, personalization schema, and migration runner**
   - **Tooling:** PostgreSQL/Lakebase, Alembic or SQL migration runner.
   - **Target Files:** `migrations/0002_tenants_profiles_stories.sql`, `scripts/migrate.py`, `src/story_engine/persistence/models.py`, `tests/integration/persistence/test_tenants.py`.
   - **Details:** Implement `users`, `user_preferences`, immutable `personalization_snapshots`, `stories`, `arcs`, and configuration flags. Include `user_id`, preference source/consent, soft delete, snapshot version, and per-story personalization enablement. Add an idempotent migration runner that uses the dedicated migration identity, records applied versions/checksums, and refuses drift.
   - **Verification:** Migration applies to an empty database and a second execution is a no-op; tests prove a snapshot cannot be created from another user’s preference and a disabled story cannot select a snapshot.
 
-- [ ] **Task 2C.2: Create branch-safe narrative, template, trait-state, and world-state schema**
+- [/] **Task 2C.2: Create branch-safe narrative, template, trait-state, and world-state schema**
   - **Tooling:** PostgreSQL/Lakebase.
   - **Target Files:** `migrations/0003_branches_world_state.sql`, `src/story_engine/persistence/branches.py`, `tests/integration/persistence/test_branch_isolation.py`.
   - **Details:** Create original/licensed templates with source-license, approved-scene-map, sponsorship/disclosure metadata; branches, chapters, branch entity state, immutable versioned `character_trait_states`, branch relationships, branch canon facts, world snapshots, choices, scenes, dialogue, revisions, canon events, and ending-option records. Record the focal character and trait-state version used by every chapter. Enforce one current-state source per branch and unique chapter indexes per branch.
   - **Verification:** Integration test forks a parent branch, changes a child entity location/trait state, and asserts the parent/sibling states remain unchanged and the historical chapter resolves its original trait version.
 
-- [ ] **Task 2C.3: Create isolated character and Director memory schema**
+- [/] **Task 2C.3: Create isolated character and Director memory schema**
   - **Tooling:** PostgreSQL/Lakebase.
   - **Target Files:** `migrations/0004_memory_and_director.sql`, `src/story_engine/persistence/memory.py`, `tests/integration/persistence/test_memory_cutoffs.py`.
   - **Details:** Create branch-aware character core/episodic/screenplay memory, one `story_director` per branch, Director strategy/decision/open-thread memory, and ancestry cutoffs. Core profile is immutable for founding cast after lock; Director memory rejects private character fields.
   - **Verification:** Test that a child branch reads inherited memory only through its fork chapter, cannot see future parent entries, and Director-memory insertion rejects a hidden-characteristic field.
 
-- [ ] **Task 2C.4: Create durable job, event, staging, and report schema**
+- [/] **Task 2C.4: Create durable job, event, staging, and report schema**
   - **Tooling:** PostgreSQL/Lakebase.
   - **Target Files:** `migrations/0005_jobs_events_reports.sql`, `src/story_engine/persistence/jobs.py`, `tests/integration/persistence/test_job_idempotency.py`.
   - **Details:** Create generation jobs/events, leases, attempts, candidate staging rows, outbox, agent runs, evaluator/business reports, and retry metadata. Enforce a single active job per branch and idempotency-key uniqueness.
   - **Verification:** Two submissions with one idempotency key return the same job; a second active job on the branch is rejected; candidate rows are inaccessible from published chapter queries.
 
-- [ ] **Task 2C.5: Enforce RLS, tenant context, and canonical write authority**
+- [/] **Task 2C.5: Enforce RLS, tenant context, and canonical write authority**
   - **Tooling:** PostgreSQL RLS, stored procedures/functions.
   - **Target Files:** `migrations/0006_rls_and_roles.sql`, `src/story_engine/persistence/tenant_context.py`, `tests/integration/persistence/test_rls.py`.
   - **Details:** Enable RLS for every user-owned table. Set tenant context via parameterized transaction-local `set_config`; expose world commits only through a narrowly privileged database function/service role. Do not grant canonical table write access to API, Director, storyteller, evaluator, or business roles.
@@ -319,7 +319,7 @@ The full decision record is maintained in `requirements-reconciliation.md`. Any 
 
 *Target isolation: `src/story_engine/api/`, `src/story_engine/app.py`, `app.yaml`, and `tests/contract/` only.*
 
-- [ ] **Task 4G.1: Create the Databricks App runtime and SPA static web serving**
+- [/] **Task 4G.1: Create the Databricks App runtime and SPA static web serving**
   - **Tooling:** Databricks Apps, FastAPI, Uvicorn, Next.js static export.
   - **Target Files:** `app.yaml`, `scripts/build_web.sh`, `src/story_engine/app.py`, `src/story_engine/api/static.py`, `resources/app.yml`.
   - **Details:** Define the App entry point, health/readiness endpoints, resource bindings, static asset directory, and production security headers. Build the Next.js client before App packaging, serve its static export, and return the SPA shell for non-`/api/*` client routes. Do not store credentials in `app.yaml`; use Lakebase/App resource injection.

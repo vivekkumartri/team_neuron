@@ -14,10 +14,18 @@ class RuntimeSettings(BaseModel):
     database_host: str | None = None
     database_name: str | None = None
     database_user: str | None = None
+    database_endpoint: str | None = None
 
     @property
     def database_resource_bound(self) -> bool:
-        return all((self.database_host, self.database_name, self.database_user))
+        return all(
+            (
+                self.database_host,
+                self.database_name,
+                self.database_user,
+                self.database_endpoint,
+            )
+        )
 
 
 def load_settings() -> RuntimeSettings:
@@ -28,4 +36,5 @@ def load_settings() -> RuntimeSettings:
         database_host=os.getenv("PGHOST"),
         database_name=os.getenv("PGDATABASE"),
         database_user=os.getenv("PGUSER"),
+        database_endpoint=os.getenv("ENDPOINT_NAME"),
     )

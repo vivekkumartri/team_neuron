@@ -14,6 +14,7 @@ from story_engine.api.events import event_stream
 from story_engine.api.settings import load_settings
 from story_engine.domain.events import ClientGenerationEvent, PublicAgentLabel
 from story_engine.domain.models import ChapterStatus
+from story_engine.persistence.lakebase import lakebase_is_ready
 
 
 class SPAStaticFiles(StaticFiles):
@@ -43,7 +44,7 @@ def create_app() -> FastAPI:
     @app.get("/api/v1/readiness", include_in_schema=False)
     def readiness() -> JSONResponse:
         settings = load_settings()
-        if not settings.database_resource_bound:
+        if not lakebase_is_ready(settings):
             return JSONResponse({"status": "unavailable"}, status_code=503)
         return JSONResponse({"status": "ready"})
 
