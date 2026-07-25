@@ -1,5 +1,4 @@
 command:
   - bash
   - -lc
-  - python -m uvicorn story_engine.app:app --host 0.0.0.0 --port 8000
-
+  - PYTHONPATH=src python -m uvicorn story_engine.app:app --host 0.0.0.0 --port 8000
