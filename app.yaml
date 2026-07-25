@@ -2,3 +2,10 @@ command:
   - bash
   - -lc
   - PYTHONPATH=src python -m uvicorn story_engine.app:app --host 0.0.0.0 --port 8000
+env:
+  - name: ENDPOINT_NAME
+    valueFrom: postgres
+  - name: OPENAI_API_KEY
+    valueFrom: openai_api_key
+  - name: OPENAI_MODEL
+    value: gpt-5.6-sol

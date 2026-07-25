@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from story_engine.app import create_app
@@ -17,9 +18,12 @@ def test_health_endpoint_does_not_expose_connection_values(monkeypatch: Any) -> 
     response = route.endpoint()  # type: ignore[union-attr]
 
     assert response.status_code == 200
-    assert response.body == (
-        b'{"status":"ok","environment":"development","lakebase_resource_bound":true}'
-    )
+    assert json.loads(response.body) == {
+        "status": "ok",
+        "environment": "development",
+        "lakebase_resource_bound": True,
+        "llm_configured": False,
+    }
 
 
 def test_readiness_requires_a_successful_database_query(monkeypatch: Any) -> None:

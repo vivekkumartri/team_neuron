@@ -12,6 +12,10 @@ resources:
         env:
           - name: ENDPOINT_NAME
             value: ${var.lakebase_endpoint}
+          - name: OPENAI_API_KEY
+            value_from: openai_api_key
+          - name: OPENAI_MODEL
+            value: gpt-5.6-sol
       # Lakebase Autoscaling resource. Databricks creates a scoped App service
       # principal role and injects PG* connection metadata at runtime; neither
       # a database password nor a connection URL belongs in source control.
@@ -21,3 +25,8 @@ resources:
             branch: ${var.lakebase_project}
             database: ${var.lakebase_database}
             permission: CAN_CONNECT_AND_CREATE
+        - name: openai_api_key
+          secret:
+            scope: story-engine-openai
+            key: openai-api-key
+            permission: READ
