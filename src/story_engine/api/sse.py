@@ -26,9 +26,18 @@ MAX_POLLS = 300  # bounded polling: ~5 minutes at the default interval
 
 
 def _row_to_event(row: tuple[Any, ...]) -> ClientGenerationEvent | None:
-    sequence, agent_label, status, summary, public_entity_id = row
+    # Five-column rows are retained only for pre-migration unit fixtures;
+    # deployed databases return the six-column coordination-aware shape.
+    if len(row) == 5:
+        sequence, agent_label, status, summary, public_entity_id = row
+        recipient_agent_label = None
+    else:
+        sequence, agent_label, recipient_agent_label, status, summary, public_entity_id = row
     try:
         agent = PublicAgentLabel(agent_label)
+        recipient_agent = (
+            PublicAgentLabel(recipient_agent_label) if recipient_agent_label is not None else None
+        )
         chapter_status = ChapterStatus(status)
     except ValueError:
         # A malformed/legacy row must never break the stream or leak an
@@ -40,6 +49,7 @@ def _row_to_event(row: tuple[Any, ...]) -> ClientGenerationEvent | None:
         sequence=sequence,
         summary=summary,
         agent=agent,
+        recipient_agent=recipient_agent,
         status=chapter_status,
         entity_id=UUID(str(public_entity_id)) if public_entity_id is not None else None,
     )
@@ -50,7 +60,8 @@ def fetch_events_after(
 ) -> list[ClientGenerationEvent]:
     with connection.cursor() as cursor:
         cursor.execute(
-            "SELECT sequence, agent_label, status, summary, public_entity_id "
+            "SELECT sequence, agent_label, recipient_agent_label, status, summary, "
+            "public_entity_id "
             "FROM generation_events WHERE job_id = %s AND sequence > %s ORDER BY sequence",
             (job_id, after_sequence),
         )

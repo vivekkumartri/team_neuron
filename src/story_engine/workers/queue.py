@@ -62,6 +62,30 @@ def claim_next_job(
     return ClaimedJob(id=job_id, branch_id=branch_id, attempt=next_attempt)
 
 
+def claim_job(connection: Connection[object], job_id: UUID) -> ClaimedJob | None:
+    """Claim one specified queued job without taking another job from the queue."""
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT id, branch_id, retry_count FROM generation_jobs "
+            "WHERE id = %s AND status = 'QUEUED' FOR UPDATE SKIP LOCKED",
+            (job_id,),
+        )
+        row = cursor.fetchone()
+        if row is None:
+            return None
+        values = cast(tuple[Any, ...], row)
+        cursor.execute(
+            "UPDATE generation_jobs SET status = 'RUNNING', lease_expires_at = now() + %s, "
+            "updated_at = now() WHERE id = %s",
+            (timedelta(seconds=DEFAULT_LEASE_SECONDS), job_id),
+        )
+    connection.commit()
+    return ClaimedJob(
+        id=UUID(str(values[0])), branch_id=UUID(str(values[1])), attempt=int(values[2])
+    )
+
+
 def release_job(connection: Connection[object], job_id: UUID, *, status: str) -> None:
     """Release a job's lease and set its terminal (or requeued) status."""
 

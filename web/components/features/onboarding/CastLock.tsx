@@ -5,12 +5,8 @@ import { useState } from "react";
 import { apiFetch } from "../../../lib/api-client";
 
 /**
- * Family-tree/cast summary and a real cast-lock endpoint don't exist in the
- * backend yet (only `POST /api/v1/stories` with a bare `title` does) — see
- * task.md Task 4H.2 status note. This view creates the story with the seed
- * as its title so the flow is real end-to-end against what exists today,
- * and is the seam where a dedicated cast/family-tree payload would attach
- * once that endpoint exists.
+ * Locking creates the story's first arc, branch, and focal character, then
+ * immediately queues Chapter 1. No sample chapter is shown as real output.
  */
 export function CastLock({
   seed,
@@ -26,10 +22,33 @@ export function CastLock({
     setLocking(true);
     setError(null);
     try {
-      const story = await apiFetch<{ id: string }>("/stories", {
+      const story = await apiFetch<{
+        id: string;
+        initial_branch_id: string | null;
+        initial_focal_entity_id: string | null;
+      }>("/stories", {
         method: "POST",
         body: { title: seed.slice(0, 200), personalization_enabled: true },
       });
+      if (!story.initial_branch_id || !story.initial_focal_entity_id) {
+        throw new Error("The story did not receive its initial branch.");
+      }
+      const job = await apiFetch<{ job_id: string }>(
+        `/branches/${story.initial_branch_id}/progression`,
+        {
+          method: "POST",
+          idempotencyKey: `chapter-1-${story.id}`,
+          body: {
+            chapter_id: null,
+            focal_entity_id: story.initial_focal_entity_id,
+            mode: "CONTINUE",
+            trait_change: null,
+            rewind_to_chapter_id: null,
+          },
+        },
+      );
+      window.localStorage.setItem("story-engine-active-branch", story.initial_branch_id);
+      window.localStorage.setItem("story-engine-active-job", job.job_id);
       onLocked(story.id);
     } catch {
       setError("Couldn't lock the cast — nothing was created. Try again.");

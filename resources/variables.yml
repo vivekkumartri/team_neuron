@@ -23,3 +23,9 @@ variables:
   volume_name:
     description: Unity Catalog Volume name for approved artifacts.
     default: artifacts
+  quality_checks_schedule_paused:
+    description: >-
+      "PAUSED" or "UNPAUSED" for the quality_checks_job schedule. Defaults to
+      paused so a fresh `dev` deploy doesn't start running an unreviewed
+      reconciliation job against real data on a cron.
+    default: "PAUSED"

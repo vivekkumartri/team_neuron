@@ -16,6 +16,8 @@ resources:
             value_from: openai_api_key
           - name: OPENAI_MODEL
             value: gpt-5.6-sol
+          - name: STORY_ENGINE_GENERATION_JOB_ID
+            value_from: generation_job
       # Lakebase Autoscaling resource. Databricks creates a scoped App service
       # principal role and injects PG* connection metadata at runtime; neither
       # a database password nor a connection URL belongs in source control.
@@ -30,3 +32,7 @@ resources:
             scope: story-engine-openai
             key: openai-api-key
             permission: READ
+        - name: generation_job
+          job:
+            id: ${resources.jobs.generation_job.id}
+            permission: CAN_MANAGE_RUN

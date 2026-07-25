@@ -9,3 +9,5 @@ env:
     valueFrom: openai_api_key
   - name: OPENAI_MODEL
     value: gpt-5.6-sol
+  - name: STORY_ENGINE_GENERATION_JOB_ID
+    valueFrom: generation_job

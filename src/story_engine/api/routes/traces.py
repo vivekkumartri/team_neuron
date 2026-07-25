@@ -27,6 +27,39 @@ class StorySettingsInput(BaseModel):
     agent_trace_enabled: bool
 
 
+@router.get("/generation-jobs/{job_id}/agent-runs", response_model=list[AgentRunResponse])
+def list_agent_runs(job_id: UUID, user: CurrentUser) -> list[AgentRunResponse]:
+    """List a job's runs, still gated by the owning story's `agent_trace_enabled`.
+
+    Closes the gap `TraceDrawer` (web/components/features/reports/TraceDrawer.tsx)
+    flagged: without this, a client needed to already know a `run_id` — there
+    was no way to discover one.
+    """
+
+    with tenant_connection(user) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT ar.id, ar.agent_label, ar.status, ar.redacted_summary "
+                "FROM agent_runs ar "
+                "JOIN generation_jobs j ON j.id = ar.job_id "
+                "JOIN branches b ON b.id = j.branch_id "
+                "JOIN stories s ON s.id = b.story_id "
+                "WHERE j.id = %s AND s.agent_trace_enabled "
+                "ORDER BY ar.created_at",
+                (job_id,),
+            )
+            rows = cast(list[tuple[Any, ...]], cursor.fetchall())
+    return [
+        AgentRunResponse(
+            id=UUID(str(row[0])),
+            agent_label=str(row[1]),
+            status=str(row[2]),
+            redacted_summary=str(row[3]),
+        )
+        for row in rows
+    ]
+
+
 @router.get("/agent-runs/{run_id}", response_model=AgentRunResponse)
 def get_agent_run(run_id: UUID, user: CurrentUser) -> AgentRunResponse:
     with tenant_connection(user) as connection:

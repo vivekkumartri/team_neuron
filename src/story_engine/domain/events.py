@@ -11,6 +11,7 @@ from story_engine.domain.models import ChapterStatus
 
 
 class PublicAgentLabel(StrEnum):
+    CHARACTER = "character"
     WORLD = "world"
     DIRECTOR = "director"
     STORYTELLER = "storyteller"
@@ -29,6 +30,6 @@ class ClientGenerationEvent(BaseModel):
     sequence: int = Field(ge=1)
     summary: str = Field(min_length=1, max_length=500)
     agent: PublicAgentLabel
+    recipient_agent: PublicAgentLabel | None = None
     status: ChapterStatus
     entity_id: UUID | None = None
-

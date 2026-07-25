@@ -55,9 +55,10 @@ class ChapterRef(BaseModel):
 class ProgressionRequest(BaseModel):
     """Exactly one author-selected way to advance a published chapter."""
 
-    chapter_id: UUID
+    # None is the explicit "start Chapter 1" sentinel. All later actions
+    # carry an immutable published chapter id.
+    chapter_id: UUID | None = None
     focal_entity_id: UUID
     mode: ProgressionMode
     trait_change: str | None = Field(default=None, max_length=2_000)
     rewind_to_chapter_id: UUID | None = None
-

@@ -44,11 +44,11 @@ def create_app() -> FastAPI:
     app.include_router(chapters_router)
     app.include_router(events_router)
     app.include_router(preferences_router)
+    app.include_router(progression_router)
     app.include_router(traces_router)
     app.include_router(world_router)
     app.include_router(endings_router)
     app.include_router(revisions_router)
-    app.include_router(progression_router)
 
     @app.get("/api/v1/health", include_in_schema=False)
     def health() -> JSONResponse:

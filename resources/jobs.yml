@@ -46,3 +46,19 @@ resources:
         - name: chapter_id
           default: ""
       max_concurrent_runs: 4
+
+    quality_checks_job:
+      # Task 5I.2: scheduled reconciliation checks. Runs the notebook wrapper
+      # directly (not a wheel task) since notebooks/03_operational_quality_checks.py
+      # is already a plain Databricks notebook — no additional wheel
+      # packaging is needed for this one.
+      name: story-engine-quality-checks-${bundle.target}
+      schedule:
+        quartz_cron_expression: "0 0 6 * * ?" # Daily at 06:00
+        timezone_id: UTC
+        pause_status: ${var.quality_checks_schedule_paused}
+      tasks:
+        - task_key: run_quality_checks
+          notebook_task:
+            notebook_path: ../notebooks/03_operational_quality_checks.py
+      max_concurrent_runs: 1

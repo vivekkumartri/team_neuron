@@ -17,6 +17,8 @@ class RuntimeSettings(BaseModel):
     database_endpoint: str | None = None
     openai_api_key: str | None = None
     openai_model: str = Field(default="gpt-5.6-sol", min_length=1, max_length=100)
+    openai_secret_scope: str = Field(default="story-engine-openai", min_length=1)
+    openai_secret_key: str = Field(default="openai-api-key", min_length=1)
 
     @property
     def database_resource_bound(self) -> bool:
@@ -51,4 +53,6 @@ def load_settings() -> RuntimeSettings:
         database_endpoint=os.getenv("ENDPOINT_NAME"),
         openai_api_key=os.getenv("OPENAI_API_KEY"),
         openai_model=os.getenv("OPENAI_MODEL", "gpt-5.6-sol"),
+        openai_secret_scope=os.getenv("OPENAI_SECRET_SCOPE", "story-engine-openai"),
+        openai_secret_key=os.getenv("OPENAI_SECRET_KEY", "openai-api-key"),
     )

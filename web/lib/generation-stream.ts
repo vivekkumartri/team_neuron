@@ -6,6 +6,7 @@ export interface GenerationActivityEvent {
   sequence: number;
   summary: string;
   agent: string;
+  recipient_agent: string | null;
   status: string;
   entity_id: string | null;
 }

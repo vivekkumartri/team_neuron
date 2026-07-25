@@ -80,3 +80,28 @@ def test_revision_request_schema_rejects_unknown_fields() -> None:
     schema = client.get("/openapi.json").json()
     request_schema = schema["components"]["schemas"]["RevisionRequestInput"]
     assert request_schema.get("additionalProperties") is False
+
+
+def test_progression_request_requires_auth() -> None:
+    response = client.post(
+        "/api/v1/branches/00000000-0000-0000-0000-000000000000/progression",
+        json={
+            "chapter_id": "00000000-0000-0000-0000-000000000000",
+            "focal_entity_id": "00000000-0000-0000-0000-000000000000",
+            "mode": "CONTINUE",
+        },
+    )
+    assert response.status_code == 401
+
+
+def test_progression_request_schema_rejects_unknown_fields() -> None:
+    schema = client.get("/openapi.json").json()
+    request_schema = schema["components"]["schemas"]["ProgressionRequestInput"]
+    assert request_schema.get("additionalProperties") is False
+
+
+def test_agent_runs_listing_requires_auth() -> None:
+    response = client.get(
+        "/api/v1/generation-jobs/00000000-0000-0000-0000-000000000000/agent-runs"
+    )
+    assert response.status_code == 401
