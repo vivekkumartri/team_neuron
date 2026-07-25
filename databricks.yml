@@ -1,0 +1,30 @@
+bundle:
+  name: story-engine
+
+include:
+  - resources/*.yml
+
+artifacts:
+  story_engine_wheel:
+    type: whl
+    path: .
+    build: .venv/bin/python -m build --wheel
+
+targets:
+  dev:
+    mode: development
+    default: true
+    workspace:
+      host: ${var.workspace_host}
+      root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}
+  staging:
+    mode: production
+    workspace:
+      host: ${var.workspace_host}
+      root_path: /Workspace/.bundle/${bundle.name}/${bundle.target}
+  prod:
+    mode: production
+    workspace:
+      host: ${var.workspace_host}
+      root_path: /Workspace/.bundle/${bundle.name}/${bundle.target}
+

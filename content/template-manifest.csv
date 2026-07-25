@@ -1,0 +1,3 @@
+template_id,title,content_path,author,rights_basis,license_evidence,approval_status,source_attribution,sponsorship_disclosure,approved_scene_map
+original-rain-market,Rain Market Mystery,content/templates/original-rain-market.md,Story Engine Editorial,original,content/templates/evidence/original-rain-market-attestation.md,approved,Original work,,content/templates/scene-maps/rain-market.json
+licensed-sample-heist,Sample Licensed Heist,content/templates/licensed-sample-heist.md,Example Rights Holder,mock-licensed,content/templates/evidence/licensed-sample-heist-license.md,approved,Mock license fixture for automated tests,Presented by Example Press,content/templates/scene-maps/sample-heist.json

@@ -1,0 +1,3 @@
+# Workspace, Unity Catalog, Lakebase, and App grants are added after resources exist.
+resources: {}
+

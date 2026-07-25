@@ -1,0 +1,46 @@
+name: Deploy Databricks bundle
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Bundle target to deploy
+        required: true
+        type: choice
+        options: [dev, staging, prod]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.target }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: python -m pip install --upgrade pip build
+      - run: python -m pip install -e '.[dev]'
+      - run: npm ci && npm run build
+      - name: Install Databricks CLI
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh
+          echo "$HOME/.databricks/bin" >> "$GITHUB_PATH"
+      - name: Validate bundle
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_CLIENT_ID: ${{ secrets.DATABRICKS_CLIENT_ID }}
+          DATABRICKS_CLIENT_SECRET: ${{ secrets.DATABRICKS_CLIENT_SECRET }}
+        run: databricks bundle validate -t "${{ inputs.target }}"
+      - name: Deploy bundle
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_CLIENT_ID: ${{ secrets.DATABRICKS_CLIENT_ID }}
+          DATABRICKS_CLIENT_SECRET: ${{ secrets.DATABRICKS_CLIENT_SECRET }}
+        run: databricks bundle deploy -t "${{ inputs.target }}"
+
