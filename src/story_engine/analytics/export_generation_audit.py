@@ -3,11 +3,20 @@
 PySpark is imported lazily inside functions (not at module scope) so this
 module can be imported — and its pure-Python helpers unit tested — in an
 environment without a Spark runtime, such as CI's plain unit-test job.
+
+`main()`/`run_audit_export` is the wheel-task entry point for Task 3F.1's
+audit-export job (`resources/jobs.yml`'s `audit_export_job`). It is only
+importable/runnable on a real Databricks cluster (it imports PySpark and the
+Databricks runtime's own `spark` session at call time) — this sandbox has
+neither, so it has never been executed; `export_completed_jobs`'s pure-Python
+siblings remain the only part of this module that's test-covered here.
 """
 
 from __future__ import annotations
 
+import argparse
 import hashlib
+import os
 from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING
@@ -82,3 +91,40 @@ def export_completed_jobs(
         target_table
     )
     return row_count
+
+
+def run_audit_export(*, source_table: str, target_table: str) -> None:
+    """Databricks wheel-task entry point: read `source_table`, append new rows.
+
+    `source_table` is expected to already be the Lakebase-federated view/table
+    joining `generation_jobs` with the redacted columns `AUDIT_SCHEMA` lists
+    (the Lakebase-side read/federation itself is provisioned by Task 1B.2/1B.3
+    infra, not by this function). Only importable and runnable inside a
+    Databricks Job cluster with a live `spark` session and Unity Catalog
+    access — never in this sandbox.
+    """
+
+    from pyspark.sql import SparkSession  # local import: only resolvable on a real cluster
+
+    spark = SparkSession.builder.getOrCreate()
+    tenant_hash_salt = os.environ["AUDIT_TENANT_HASH_SALT"]
+    source_rows = spark.table(source_table)
+    row_count = export_completed_jobs(
+        spark,
+        source_rows=source_rows,
+        target_table=target_table,
+        tenant_hash_salt=tenant_hash_salt,
+    )
+    print(f"audit_export: appended {row_count} row(s) to {target_table}")  # noqa: T201
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--source-table", required=True)
+    parser.add_argument("--target-table", required=True)
+    args = parser.parse_args()
+    run_audit_export(source_table=args.source_table, target_table=args.target_table)
+
+
+if __name__ == "__main__":
+    main()

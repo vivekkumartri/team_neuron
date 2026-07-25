@@ -13,6 +13,7 @@ from uuid import UUID
 
 from psycopg import Connection
 
+from story_engine.analytics.observability import CorrelatedLogRecord, MetricEvent, emit
 from story_engine.workers.outbox import fetch_unpublished, mark_published
 
 logger = logging.getLogger(__name__)
@@ -45,7 +46,11 @@ def dispatch_pending(
 
     A launch failure (the launcher raising) leaves that entry unpublished so
     it is retried on the next poll rather than being dropped or, worse,
-    silently re-creating a Lakebase job row.
+    silently re-creating a Lakebase job row. Every launch attempt is a
+    correlated `emit()` call keyed by the job id, so a launch failure and its
+    eventual successful retry show up as one traceable chain in logs (Task
+    5I.1's observability module) — this is the first real caller of that
+    module; nothing invoked it before this track.
     """
 
     dispatched = 0
@@ -59,6 +64,13 @@ def dispatch_pending(
         except Exception:
             logger.exception(
                 "Failed to launch %s for outbox entry %s; leaving retryable", job_key, entry.id
+            )
+            emit(
+                CorrelatedLogRecord(
+                    correlation_id=entry.aggregate_id,
+                    event=MetricEvent.RETRY_COUNT,
+                    payload={"job_key": job_key, "outbox_entry_id": str(entry.id)},
+                )
             )
             continue
         mark_published(connection, entry.id)

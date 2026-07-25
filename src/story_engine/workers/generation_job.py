@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import base64
 import logging
+import time
 from typing import Any, cast
 from uuid import UUID
 
@@ -12,9 +13,17 @@ from databricks.sdk import WorkspaceClient
 from psycopg import Connection
 from psycopg.types.json import Jsonb
 
-from story_engine.agents.prompts.system import CHARACTER, DIRECTOR, EVALUATOR, STORYTELLER, WORLD
+from story_engine.agents.prompts.system import (
+    CHARACTER,
+    DIRECTOR,
+    EVALUATOR,
+    WORLD,
+    storyteller_prompt_for_language,
+)
 from story_engine.agents.provider import ModelProviderError, OpenAIResponsesProvider
+from story_engine.analytics.observability import CorrelatedLogRecord, MetricEvent, emit
 from story_engine.api.settings import RuntimeSettings, load_settings
+from story_engine.domain.models import StoryLanguage
 from story_engine.domain.policy_models import PolicyDecision, PolicySubject
 from story_engine.persistence.lakebase import lakebase_connection
 from story_engine.persistence.tenant_context import set_tenant_context
@@ -69,11 +78,40 @@ def _write_run(connection: Connection[object], *, job_id: UUID, agent: str, summ
         )
 
 
+def _timed_complete(
+    provider: OpenAIResponsesProvider,
+    *,
+    job_id: UUID,
+    agent: str,
+    system_prompt: str,
+    user_data: str,
+    model: str,
+) -> str:
+    """`provider.complete` wrapped with an `AGENT_LATENCY` metric.
+
+    This is the first real caller of `analytics.observability.emit()` from
+    inside the actual generation loop — previously only the job dispatcher
+    called it, and this loop made no metric calls at all.
+    """
+
+    started = time.monotonic()
+    result = provider.complete(system_prompt=system_prompt, user_data=user_data, model=model)
+    emit(
+        CorrelatedLogRecord(
+            correlation_id=job_id,
+            event=MetricEvent.AGENT_LATENCY,
+            payload={"agent": agent, "seconds": round(time.monotonic() - started, 3)},
+        )
+    )
+    return result
+
+
 def run_generation_job(job_id: UUID) -> None:
     """Generate, evaluate, stage, and automatically publish one chapter."""
 
     settings = load_settings()
     api_key = _load_openai_api_key(settings)
+    loop_started = time.monotonic()
 
     with lakebase_connection(settings) as connection:
         claimed = claim_job(connection, job_id)
@@ -83,7 +121,7 @@ def run_generation_job(job_id: UUID) -> None:
         try:
             with connection.cursor() as cursor:
                 cursor.execute(
-                    "SELECT j.requested_by_user_id, s.title, e.id, e.name "
+                    "SELECT j.requested_by_user_id, s.title, e.id, e.name, s.language "
                     "FROM generation_jobs j "
                     "JOIN branches b ON b.id = j.branch_id "
                     "JOIN stories s ON s.id = b.story_id "
@@ -94,10 +132,13 @@ def run_generation_job(job_id: UUID) -> None:
                 row = cursor.fetchone()
             if row is None:
                 raise RuntimeError("Generation job context is unavailable")
-            requester_id, story_title, focal_id, focal_name = cast(tuple[Any, ...], row)
+            requester_id, story_title, focal_id, focal_name, story_language = cast(
+                tuple[Any, ...], row
+            )
             if focal_id is None:
                 raise RuntimeError("A story needs at least one character before generation")
             set_tenant_context(connection, UUID(str(requester_id)))
+            language = StoryLanguage(str(story_language))
 
             provider = OpenAIResponsesProvider(api_key=api_key)
             story_context = (
@@ -114,8 +155,13 @@ def run_generation_job(job_id: UUID) -> None:
                 status="GENERATING",
                 summary="Character is sharing their immediate perspective with the Director.",
             )
-            character = provider.complete(
-                system_prompt=CHARACTER, user_data=story_context, model=settings.openai_model
+            character = _timed_complete(
+                provider,
+                job_id=job_id,
+                agent="character",
+                system_prompt=CHARACTER,
+                user_data=story_context,
+                model=settings.openai_model,
             )
             _write_run(
                 connection,
@@ -134,7 +180,10 @@ def run_generation_job(job_id: UUID) -> None:
                 status="GENERATING",
                 summary="Director is briefing World on the proposed next beat.",
             )
-            director = provider.complete(
+            director = _timed_complete(
+                provider,
+                job_id=job_id,
+                agent="director",
                 system_prompt=DIRECTOR,
                 user_data=f"{story_context}\nCharacter perspective:\n{character}",
                 model=settings.openai_model,
@@ -151,7 +200,10 @@ def run_generation_job(job_id: UUID) -> None:
                 status="GENERATING",
                 summary="World is validating branch continuity for the proposed beat.",
             )
-            world = provider.complete(
+            world = _timed_complete(
+                provider,
+                job_id=job_id,
+                agent="world",
                 system_prompt=WORLD,
                 user_data=f"{story_context}\nDirector proposal:\n{director}",
                 model=settings.openai_model,
@@ -173,8 +225,11 @@ def run_generation_job(job_id: UUID) -> None:
                 status="GENERATING",
                 summary="Storyteller is drafting scenes and character dialogue.",
             )
-            screenplay = provider.complete(
-                system_prompt=STORYTELLER,
+            screenplay = _timed_complete(
+                provider,
+                job_id=job_id,
+                agent="storyteller",
+                system_prompt=storyteller_prompt_for_language(language),
                 user_data=(
                     f"{story_context}\nCharacter perspective:\n{character}\n"
                     f"Director:\n{director}\nWorld:\n{world}"
@@ -201,7 +256,10 @@ def run_generation_job(job_id: UUID) -> None:
                 status="EVALUATING",
                 summary="Evaluator is checking the candidate before publication.",
             )
-            evaluator = provider.complete(
+            evaluator = _timed_complete(
+                provider,
+                job_id=job_id,
+                agent="evaluator",
                 system_prompt=EVALUATOR,
                 user_data=f"{story_context}\nWorld constraints:\n{world}\nCandidate:\n{screenplay}",
                 model=settings.openai_model,
@@ -268,10 +326,30 @@ def run_generation_job(job_id: UUID) -> None:
             )
             connection.commit()
             release_job(connection, job_id, status="SUCCEEDED" if approved else "BLOCKED")
+            emit(
+                CorrelatedLogRecord(
+                    correlation_id=job_id,
+                    event=MetricEvent.CHAPTER_LOOP_COMPLETION,
+                    payload={
+                        "outcome": "SUCCEEDED" if approved else "BLOCKED",
+                        "seconds": round(time.monotonic() - loop_started, 3),
+                    },
+                )
+            )
         except (ModelProviderError, RuntimeError, ValueError):
             logger.exception("Generation job %s failed", job_id)
             connection.rollback()
             release_job(connection, job_id, status="FAILED")
+            emit(
+                CorrelatedLogRecord(
+                    correlation_id=job_id,
+                    event=MetricEvent.CHAPTER_LOOP_COMPLETION,
+                    payload={
+                        "outcome": "FAILED",
+                        "seconds": round(time.monotonic() - loop_started, 3),
+                    },
+                )
+            )
             raise
 
 
