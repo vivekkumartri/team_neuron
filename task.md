@@ -152,7 +152,7 @@ The full decision record is maintained in `requirements-reconciliation.md`. Any 
   - **Details:** Create environment-specific catalog/schema naming conventions and a managed UC Volume for approved artifacts. Create the Delta audit table namespace. Keep transactional request data in Lakebase, not Delta.
   - **Verification:** Execute the notebook; `SHOW SCHEMAS IN <catalog>` and `dbutils.fs.ls('/Volumes/<catalog>/<schema>/<volume>')` show the expected resources.
 
-- [ ] **Task 1B.2: Provision Lakebase Postgres and baseline roles**
+- [/] **Task 1B.2: Provision Lakebase Postgres and baseline roles**
   - **Tooling:** Lakebase, PostgreSQL migrations.
   - **Target Files:** `resources/lakebase.yml`, `migrations/0001_bootstrap.sql`, `notebooks/01_lakebase_smoke_test.py`.
   - **Details:** Create separate Lakebase branches/databases for `dev`, `staging`, and `prod`; configure the App and Job resource bindings. Create non-owner application roles. Add extensions required for UUIDs and row-level security.
