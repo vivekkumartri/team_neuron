@@ -11,15 +11,20 @@ from sse_starlette.sse import EventSourceResponse
 from starlette.responses import Response
 
 from story_engine.api.events import event_stream
+from story_engine.api.routes.archive import router as archive_router
 from story_engine.api.routes.branches import router as branches_router
+from story_engine.api.routes.cast import router as cast_router
 from story_engine.api.routes.chapters import router as chapters_router
 from story_engine.api.routes.endings import router as endings_router
 from story_engine.api.routes.events import router as events_router
+from story_engine.api.routes.narration import router as narration_router
 from story_engine.api.routes.preferences import router as preferences_router
+from story_engine.api.routes.progression import me_quota_router
 from story_engine.api.routes.progression import router as progression_router
 from story_engine.api.routes.revisions import router as revisions_router
 from story_engine.api.routes.stories import router as stories_router
 from story_engine.api.routes.traces import router as traces_router
+from story_engine.api.routes.voice import router as voice_router
 from story_engine.api.routes.world import router as world_router
 from story_engine.api.settings import load_settings
 from story_engine.domain.events import ClientGenerationEvent, PublicAgentLabel
@@ -45,10 +50,15 @@ def create_app() -> FastAPI:
     app.include_router(events_router)
     app.include_router(preferences_router)
     app.include_router(progression_router)
+    app.include_router(me_quota_router)
     app.include_router(traces_router)
     app.include_router(world_router)
     app.include_router(endings_router)
     app.include_router(revisions_router)
+    app.include_router(cast_router)
+    app.include_router(archive_router)
+    app.include_router(narration_router)
+    app.include_router(voice_router)
 
     @app.get("/api/v1/health", include_in_schema=False)
     def health() -> JSONResponse:

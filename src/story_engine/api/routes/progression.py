@@ -21,10 +21,36 @@ from story_engine.api.auth import AuthenticatedUser, authenticate_request, tenan
 from story_engine.domain.models import ProgressionMode, ProgressionRequest
 from story_engine.services.databricks_jobs import DatabricksJobLauncher, JobLaunchError
 from story_engine.services.progression import ProgressionError, target_branch_for_progression
+from story_engine.services.quotas import (
+    QuotaCategory,
+    QuotaExceededError,
+    current_quota_states,
+    enforce_quota,
+)
 from story_engine.workers.outbox import mark_published, write_outbox_entry
 
 router = APIRouter(prefix="/api/v1/branches", tags=["progression"])
 CurrentUser = Annotated[AuthenticatedUser, Depends(authenticate_request)]
+
+
+class QuotaStateResponse(BaseModel):
+    category: str
+    used: int
+    limit: int
+    remaining: int
+    exceeded: bool
+    approaching: bool
+
+
+def _quota_response(state: object) -> QuotaStateResponse:
+    return QuotaStateResponse(
+        category=state.category.value,  # type: ignore[attr-defined]
+        used=state.used,  # type: ignore[attr-defined]
+        limit=state.limit,  # type: ignore[attr-defined]
+        remaining=state.remaining,  # type: ignore[attr-defined]
+        exceeded=state.exceeded,  # type: ignore[attr-defined]
+        approaching=state.approaching,  # type: ignore[attr-defined]
+    )
 
 
 class ProgressionRequestInput(BaseModel):
@@ -115,6 +141,20 @@ def submit_progression(
                 )
                 target_branch_id = cast(tuple[Any, ...], cursor.fetchone())[0]
 
+        # Quota check happens after idempotency replay (a replayed request must
+        # never be re-blocked) but before the job row is inserted, so a
+        # rejected submission never creates a QUEUED job or outbox entry.
+        for state in current_quota_states(connection, user_id=user.id):
+            if state.category is QuotaCategory.CONCURRENT_GENERATION_JOBS:
+                try:
+                    enforce_quota(state)
+                except QuotaExceededError as error:
+                    raise HTTPException(
+                        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                        detail={"quota": _quota_response(error.state).model_dump()},
+                    ) from error
+
+        with connection.cursor() as cursor:
             try:
                 cursor.execute(
                     "INSERT INTO generation_jobs "
@@ -151,3 +191,13 @@ def submit_progression(
     return ProgressionResponse(
         job_id=job_id, branch_id=UUID(str(target_branch_id)), status=job_status
     )
+
+
+me_quota_router = APIRouter(prefix="/api/v1/me", tags=["quota"])
+
+
+@me_quota_router.get("/quota", response_model=list[QuotaStateResponse])
+def get_my_quota(user: CurrentUser) -> list[QuotaStateResponse]:
+    with tenant_connection(user) as connection:
+        states = current_quota_states(connection, user_id=user.id)
+    return [_quota_response(state) for state in states]

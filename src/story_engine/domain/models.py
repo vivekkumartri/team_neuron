@@ -41,6 +41,19 @@ class ProgressionMode(StrEnum):
     REWIND = "REWIND"
 
 
+class StoryLanguage(StrEnum):
+    """The three languages this app supports for story content and voice.
+
+    Scope decision (see task.md Phase 6 multilingual entry): only story
+    CONTENT (generated prose/dialogue) and VOICE (STT hint + TTS) are
+    multilingual. The UI chrome stays English regardless of this value.
+    """
+
+    ENGLISH = "en"
+    HINDI = "hi"
+    TELUGU = "te"
+
+
 class ChapterRef(BaseModel):
     """Minimal immutable chapter identity used at service boundaries."""
 

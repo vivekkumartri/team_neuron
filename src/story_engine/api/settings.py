@@ -19,6 +19,9 @@ class RuntimeSettings(BaseModel):
     openai_model: str = Field(default="gpt-5.6-sol", min_length=1, max_length=100)
     openai_secret_scope: str = Field(default="story-engine-openai", min_length=1)
     openai_secret_key: str = Field(default="openai-api-key", min_length=1)
+    openai_transcription_model: str = Field(default="whisper-1", min_length=1, max_length=100)
+    openai_tts_model: str = Field(default="tts-1", min_length=1, max_length=100)
+    narrator_voice: str = Field(default="alloy", min_length=1, max_length=64)
 
     @property
     def database_resource_bound(self) -> bool:
@@ -55,4 +58,7 @@ def load_settings() -> RuntimeSettings:
         openai_model=os.getenv("OPENAI_MODEL", "gpt-5.6-sol"),
         openai_secret_scope=os.getenv("OPENAI_SECRET_SCOPE", "story-engine-openai"),
         openai_secret_key=os.getenv("OPENAI_SECRET_KEY", "openai-api-key"),
+        openai_transcription_model=os.getenv("OPENAI_TRANSCRIPTION_MODEL", "whisper-1"),
+        openai_tts_model=os.getenv("OPENAI_TTS_MODEL", "tts-1"),
+        narrator_voice=os.getenv("NARRATOR_VOICE", "alloy"),
     )

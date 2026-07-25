@@ -89,6 +89,61 @@ def get_agent_run(run_id: UUID, user: CurrentUser) -> AgentRunResponse:
     )
 
 
+class BusinessReportResponse(BaseModel):
+    id: UUID
+    candidate_id: UUID
+    chapter_id: UUID | None
+    disclosed_weighting: dict[str, Any]
+    redacted_summary: str
+    created_at: str
+
+
+@router.get(
+    "/branches/{branch_id}/business-reports",
+    response_model=list[BusinessReportResponse],
+)
+def list_business_reports(branch_id: UUID, user: CurrentUser) -> list[BusinessReportResponse]:
+    """Read-only aggregate view of `report_job.py`'s post-publication business
+
+    reports for one branch. RLS-scoped the same way the underlying table's
+    own `business_reports_owner` policy (migration 0006) is: candidate ->
+    branch -> story -> owning user, so this route only needs to add the
+    `branch_id` filter — `tenant_connection`'s session already restricts rows
+    to ones the caller's policy would allow regardless.
+
+    Closes Task 4H.4's "no aggregate evaluator/business report view beyond
+    per-run traces" gap. Reports are joined back to their published chapter
+    (if any) via `chapters.candidate_id` so a client can deep-link into the
+    chapter that report is about; a report whose candidate was never
+    published (e.g. it was superseded) still lists with `chapter_id: null`.
+    """
+
+    with tenant_connection(user) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT br.id, br.candidate_id, ch.id, br.disclosed_weighting, "
+                "br.redacted_summary, br.created_at "
+                "FROM business_reports br "
+                "JOIN candidate_chapters cc ON cc.id = br.candidate_id "
+                "LEFT JOIN chapters ch ON ch.candidate_id = cc.id "
+                "WHERE cc.branch_id = %s "
+                "ORDER BY br.created_at DESC",
+                (branch_id,),
+            )
+            rows = cast(list[tuple[Any, ...]], cursor.fetchall())
+    return [
+        BusinessReportResponse(
+            id=UUID(str(row[0])),
+            candidate_id=UUID(str(row[1])),
+            chapter_id=UUID(str(row[2])) if row[2] is not None else None,
+            disclosed_weighting=cast(dict[str, Any], row[3]),
+            redacted_summary=str(row[4]),
+            created_at=row[5].isoformat() if hasattr(row[5], "isoformat") else str(row[5]),
+        )
+        for row in rows
+    ]
+
+
 @router.patch(
     "/stories/{story_id}/settings",
     status_code=status.HTTP_204_NO_CONTENT,
