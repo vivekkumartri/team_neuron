@@ -1,0 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { color-scheme: dark; }
+body { margin: 0; background: #11101a; color: #f4f1ea; font-family: Arial, sans-serif; }
+button:focus-visible { outline: 3px solid #2dd4bf; outline-offset: 3px; }
