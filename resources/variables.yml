@@ -1,6 +1,7 @@
 variables:
   workspace_host:
-    description: Databricks workspace URL for the selected target.
+    description: Legacy workspace URL variable; DAB authentication hosts must be set per target.
+    default: ""
   app_name:
     description: Globally unique lowercase Databricks App name.
     default: story-engine
@@ -19,4 +20,3 @@ variables:
   volume_name:
     description: Unity Catalog Volume name for approved artifacts.
     default: artifacts
-

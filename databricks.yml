@@ -15,7 +15,9 @@ targets:
     mode: development
     default: true
     workspace:
-      host: ${var.workspace_host}
+      # DAB authentication cannot resolve a custom ${var.*} host value.
+      # This workspace URL is non-secret; credentials remain in the CLI profile.
+      host: https://dbc-391733e3-7ef7.cloud.databricks.com
       root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}
   staging:
     mode: production
@@ -27,4 +29,3 @@ targets:
     workspace:
       host: ${var.workspace_host}
       root_path: /Workspace/.bundle/${bundle.name}/${bundle.target}
-

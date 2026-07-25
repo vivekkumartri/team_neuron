@@ -118,7 +118,7 @@ The full decision record is maintained in `requirements-reconciliation.md`. Any 
   - **Details:** Create one repository containing the Python application/wheel and Next.js web client. Pin Python and Node versions. Ignore `.env*`, build outputs, local certificates, Databricks CLI profiles, and generated static assets.
   - **Verification:** `git status --ignored`; `python -m pip install -e '.[dev]'`; `npm ci`; `npm run typecheck`.
 
-- [/] **Task 1A.2: Create the Declarative Automation Bundle skeleton**
+- [x] **Task 1A.2: Create the Declarative Automation Bundle skeleton**
   - **Tooling:** Databricks CLI, Declarative Automation Bundles.
   - **Target Files:** `databricks.yml`, `resources/variables.yml`, `resources/app.yml`, `resources/jobs.yml`, `resources/permissions.yml`.
   - **Details:** Define `dev`, `staging`, and `prod` targets. Parameterize workspace host, catalog, schema, Lakebase project/database, app name, service principal, and UC Volume. Do not create or edit `resources/lakebase.yml`; Task 1B.2 is its sole owner. Do not hard-code workspace IDs or credentials.
