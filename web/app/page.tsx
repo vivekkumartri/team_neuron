@@ -1,21 +1,24 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { AppShell } from "../components/app-shell/AppShell";
 import { EndingOptionsView } from "../components/features/endings/EndingOptionsView";
 import { OnboardingFlow } from "../components/features/onboarding/OnboardingFlow";
+import { BusinessReportsView } from "../components/features/reports/BusinessReportsView";
 import { TraceDrawer } from "../components/features/reports/TraceDrawer";
+import { StoryList } from "../components/features/stories/StoryList";
 import { WorkspaceView } from "../components/features/workspace/WorkspaceView";
 import { WorldView } from "../components/features/world/WorldView";
 import { useClientRouter } from "../lib/client-router";
+import { useSelectedBranch } from "../lib/story-context";
 
 /**
- * There is no story/branch context provider yet (no UI has ever listed a
- * user's stories/branches and let them pick one) — that's a further gap
- * beyond this component. Until it exists, these views take their scoping id
- * from a plain text field so they're exercising the real backend routes
- * rather than being unreachable placeholders.
+ * `/world`, `/endings`, and `/reports` still don't have a per-view story
+ * picker of their own (only `/workspace` reads the shared "active branch"),
+ * so they keep a plain text-box fallback for now — narrower gap than before,
+ * where nothing in `app/page.tsx` had ever imported the real `StoryList`
+ * picker at all.
  */
 function IdScopedView({
   title,
@@ -45,20 +48,16 @@ function IdScopedView({
 }
 
 function WorkspaceRoute() {
-  const [branchId, setBranchId] = useState<string | null>(null);
-
-  useEffect(() => {
-    setBranchId(window.localStorage.getItem("story-engine-active-branch"));
-  }, []);
+  const { branchId } = useSelectedBranch();
 
   if (!branchId) {
     return (
-      <section className="mx-auto max-w-2xl rounded-xl border border-stone-700 bg-[#191724] p-8">
+      <section className="mx-auto max-w-2xl space-y-4 rounded-xl border border-stone-700 bg-[#191724] p-8">
         <h1 className="text-2xl font-semibold">Choose or create a story</h1>
-        <p className="mt-2 text-sm text-stone-300">
-          Start a story to create its first timeline. Existing-story selection will appear here once
-          a story has been opened in this browser.
+        <p className="text-sm text-stone-300">
+          Pick one of your stories below, or start a new one to create its first timeline.
         </p>
+        <StoryList />
       </section>
     );
   }
@@ -86,11 +85,18 @@ function RouteOutlet() {
   }
   if (pathname === "/reports") {
     return (
-      <IdScopedView
-        title="Reports"
-        placeholder="Agent run ID"
-        render={(id) => <TraceDrawer runId={id} />}
-      />
+      <section className="mx-auto max-w-2xl space-y-8">
+        <IdScopedView
+          title="Business reports"
+          placeholder="Branch ID"
+          render={(id) => <BusinessReportsView branchId={id} />}
+        />
+        <IdScopedView
+          title="Agent trace"
+          placeholder="Agent run ID"
+          render={(id) => <TraceDrawer runId={id} />}
+        />
+      </section>
     );
   }
   return <OnboardingFlow onStoryReady={() => navigate("/workspace")} />;

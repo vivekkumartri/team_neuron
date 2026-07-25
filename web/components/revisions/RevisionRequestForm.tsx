@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { apiFetch } from "../../lib/api-client";
+import { VoiceInputButton } from "../shared/VoiceInputButton";
 
 /**
  * "Edit as revision" never edits the published chapter in place — submitting
@@ -48,6 +49,10 @@ export function RevisionRequestForm({ chapterId }: { chapterId: string }) {
           className="mt-1 w-full rounded-lg border border-stone-700 bg-[#11101a] p-3"
         />
       </label>
+      <VoiceInputButton
+        label="Speak your patch"
+        onTranscript={(text) => setPatch((current) => (current.trim() ? `${current.trim()} ${text}` : text))}
+      />
       {status === "error" && (
         <p role="alert" className="text-sm text-rose-300">
           Couldn't submit the revision request. Nothing was changed.

@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 
+import { VoiceInputButton } from "../../shared/VoiceInputButton";
+
 /**
  * Seed clarification with NO hard character minimum — the retired prototype
  * gated progression behind a `>= 20` character count; this MVP instead shows
@@ -39,6 +41,13 @@ export function SeedForm({ onContinue }: { onContinue: (seed: string) => void })
         rows={4}
         className="w-full rounded-lg border border-stone-700 bg-[#11101a] p-3 text-stone-100"
         placeholder="A lighthouse keeper who can hear the ships that never made it home."
+      />
+      <VoiceInputButton
+        label="Speak your seed"
+        onTranscript={(text) => {
+          setSeed((current) => (current.trim() ? `${current.trim()} ${text}` : text));
+          setAcknowledgedShortSeed(false);
+        }}
       />
       {needsClarification && (
         <div role="status" className="rounded-lg border border-amber-300/60 bg-amber-950/20 p-3 text-sm text-amber-100">

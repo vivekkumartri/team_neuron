@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { apiFetch } from "../../lib/api-client";
+import { VoiceInputButton } from "../shared/VoiceInputButton";
 
 /**
  * Requesting a canon event (including a "kill"/removal event) never changes
@@ -95,6 +96,12 @@ export function CanonEventRequestDialog({
           className="mt-1 w-full rounded-lg border border-stone-700 bg-[#11101a] p-2"
         />
       </label>
+      <VoiceInputButton
+        label="Speak rationale"
+        onTranscript={(text) =>
+          setRationale((current) => (current.trim() ? `${current.trim()} ${text}` : text))
+        }
+      />
       <label className="flex items-center gap-2 text-sm">
         <input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />
         I understand this only submits a request for review.

@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { apiFetch, ApiError } from "../../../lib/api-client";
 import { useGenerationStream } from "../../../lib/generation-stream";
 import { ActivityFeed } from "./ActivityFeed";
 import { AgentCoordinationCanvas } from "./AgentCoordinationCanvas";
 import { BranchControls, type ProgressionMode } from "./BranchControls";
+import { QuotaBanner, type QuotaBannerState } from "./QuotaBanner";
+import { VoiceInputButton } from "../../shared/VoiceInputButton";
 
 interface ProgressionResponse {
   job_id: string;
@@ -36,6 +38,7 @@ export function WorkspaceView({ branchId }: { branchId: string }) {
   const [jobId, setJobId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [quotaState, setQuotaState] = useState<QuotaBannerState | null>(null);
 
   const { events, connectionState, complete } = useGenerationStream(jobId);
 
@@ -46,6 +49,25 @@ export function WorkspaceView({ branchId }: { branchId: string }) {
       setJobId(activeJob);
     }
   }, [branchId]);
+
+  const refreshQuota = useCallback(async () => {
+    try {
+      const states = await apiFetch<QuotaBannerState[]>("/me/quota");
+      setQuotaState(
+        states.find((state) => state.exceeded) ??
+          states.find((state) => state.approaching) ??
+          null,
+      );
+    } catch {
+      // Quota visibility must not prevent an author from viewing or working
+      // in an existing branch when the read-only quota endpoint is unavailable.
+      setQuotaState(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshQuota();
+  }, [refreshQuota]);
 
   const submit = async (mode: ProgressionMode) => {
     setError(null);
@@ -73,6 +95,7 @@ export function WorkspaceView({ branchId }: { branchId: string }) {
       }
     } finally {
       setSubmitting(false);
+      void refreshQuota();
     }
   };
 
@@ -106,6 +129,14 @@ export function WorkspaceView({ branchId }: { branchId: string }) {
               onChange={(event) => setTraitChange(event.target.value)}
               className="mt-1 w-full rounded-lg border border-stone-700 bg-[#11101a] p-2 text-sm"
             />
+            <div className="mt-2">
+              <VoiceInputButton
+                label="Speak trait change"
+                onTranscript={(text) =>
+                  setTraitChange((current) => (current.trim() ? `${current.trim()} ${text}` : text))
+                }
+              />
+            </div>
           </label>
           <label className="block text-sm sm:col-span-2">
             Rewind-to chapter ID (only used for "Jump / rewind")
@@ -115,6 +146,9 @@ export function WorkspaceView({ branchId }: { branchId: string }) {
               className="mt-1 w-full rounded-lg border border-stone-700 bg-[#11101a] p-2 font-mono text-xs"
             />
           </label>
+        </div>
+        <div className="mt-4">
+          <QuotaBanner state={quotaState} />
         </div>
         {error && (
           <p role="alert" className="mt-3 text-sm text-rose-300">

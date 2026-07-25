@@ -3,6 +3,8 @@
 import { useState } from "react";
 
 import { apiFetch } from "../../../lib/api-client";
+import type { CastCharacter } from "./CastEditor";
+import type { StoryLanguageCode } from "./LanguagePicker";
 
 /**
  * Locking creates the story's first arc, branch, and focal character, then
@@ -10,9 +12,13 @@ import { apiFetch } from "../../../lib/api-client";
  */
 export function CastLock({
   seed,
+  language,
+  cast,
   onLocked,
 }: {
   seed: string;
+  language: StoryLanguageCode;
+  cast: CastCharacter[];
   onLocked: (storyId: string) => void;
 }) {
   const [locking, setLocking] = useState(false);
@@ -24,15 +30,27 @@ export function CastLock({
     try {
       const story = await apiFetch<{
         id: string;
+        language: string;
         initial_branch_id: string | null;
         initial_focal_entity_id: string | null;
       }>("/stories", {
         method: "POST",
-        body: { title: seed.slice(0, 200), personalization_enabled: true },
+        body: {
+          title: seed.slice(0, 200),
+          personalization_enabled: true,
+          language,
+          cast,
+        },
       });
       if (!story.initial_branch_id || !story.initial_focal_entity_id) {
         throw new Error("The story did not receive its initial branch.");
       }
+      // Stored so `VoiceInputButton` instances elsewhere in the app (which
+      // don't otherwise have the current story object in scope) can pass a
+      // language hint to `WS /api/v1/voice/transcribe` — the same
+      // localStorage-for-cross-flow-state convention already used for
+      // `story-engine-active-branch`/`story-engine-active-job` below.
+      window.localStorage.setItem("story-engine-story-language", story.language);
       const job = await apiFetch<{ job_id: string }>(
         `/branches/${story.initial_branch_id}/progression`,
         {
