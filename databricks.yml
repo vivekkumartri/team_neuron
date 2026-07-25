@@ -8,7 +8,7 @@ artifacts:
   story_engine_wheel:
     type: whl
     path: .
-    build: npm run build && python -m build --wheel
+    build: npm run build && python3 -m pip wheel . --wheel-dir dist --no-deps
 
 targets:
   dev:
