@@ -7,15 +7,20 @@ resources:
   jobs:
     generation_job:
       name: story-engine-generation-${bundle.target}
+      environments:
+        - environment_key: serverless
+          spec:
+            environment_version: "4"
+            dependencies:
+              - ../dist/*.whl
       tasks:
         - task_key: run_generation
+          environment_key: serverless
           python_wheel_task:
             package_name: story_engine
             entry_point: run_generation_job
             named_parameters:
               job-id: "{{job.parameters.job_id}}"
-          libraries:
-            - whl: ../dist/*.whl
       parameters:
         - name: job_id
           default: ""
@@ -23,15 +28,20 @@ resources:
 
     report_job:
       name: story-engine-report-${bundle.target}
+      environments:
+        - environment_key: serverless
+          spec:
+            environment_version: "4"
+            dependencies:
+              - ../dist/*.whl
       tasks:
         - task_key: run_report
+          environment_key: serverless
           python_wheel_task:
             package_name: story_engine
             entry_point: run_report_job
             named_parameters:
               chapter-id: "{{job.parameters.chapter_id}}"
-          libraries:
-            - whl: ../dist/*.whl
       parameters:
         - name: chapter_id
           default: ""

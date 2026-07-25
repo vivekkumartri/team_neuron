@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Annotated, Any, cast
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, ConfigDict
 
 from story_engine.api.auth import AuthenticatedUser, authenticate_request, tenant_connection
@@ -56,7 +56,12 @@ def get_agent_run(run_id: UUID, user: CurrentUser) -> AgentRunResponse:
     )
 
 
-@router.patch("/stories/{story_id}/settings", status_code=status.HTTP_204_NO_CONTENT)
+@router.patch(
+    "/stories/{story_id}/settings",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+    response_model=None,
+)
 def update_story_settings(story_id: UUID, payload: StorySettingsInput, user: CurrentUser) -> None:
     with tenant_connection(user) as connection:
         with connection.cursor() as cursor:

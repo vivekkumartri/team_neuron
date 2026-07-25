@@ -2,7 +2,12 @@ bundle:
   name: story-engine
 
 include:
-  - resources/*.yml
+  # Explicitly include deployable resources. This keeps optional local
+  # Free Edition variants from colliding with the production App resource.
+  - resources/app.yml
+  - resources/jobs.yml
+  - resources/permissions.yml
+  - resources/variables.yml
 
 artifacts:
   story_engine_wheel:

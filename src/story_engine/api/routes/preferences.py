@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import Annotated, Any, cast
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, ConfigDict, Field
 
 from story_engine.api.auth import AuthenticatedUser, authenticate_request, tenant_connection
@@ -93,7 +93,12 @@ def upsert_preference(payload: PreferenceInput, user: CurrentUser) -> Preference
     return _preference_response(cast(tuple[Any, ...], row))
 
 
-@router.delete("/preferences/{preference_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/preferences/{preference_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+    response_model=None,
+)
 def delete_preference(preference_id: UUID, user: CurrentUser) -> None:
     with tenant_connection(user) as connection:
         with connection.cursor() as cursor:
