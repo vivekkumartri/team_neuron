@@ -30,6 +30,7 @@ export interface VoiceTranscriptState {
   finalText: string | null;
   rejection: { message: string; safeAlternative: string | null } | null;
   errorMessage: string | null;
+  audioLevel: number;
   start: () => Promise<void>;
   stop: () => void;
 }
@@ -61,17 +62,33 @@ export function useVoiceTranscription(
     null,
   );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [audioLevel, setAudioLevel] = useState(0);
 
   const socketRef = useRef<WebSocket | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const levelAnimationRef = useRef<number | null>(null);
+  const sampleBufferRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
 
   const cleanup = useCallback(() => {
     recorderRef.current?.stream.getTracks().forEach((track) => track.stop());
     recorderRef.current = null;
+    streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
     socketRef.current?.close();
     socketRef.current = null;
+    if (levelAnimationRef.current !== null) {
+      cancelAnimationFrame(levelAnimationRef.current);
+      levelAnimationRef.current = null;
+    }
+    analyserRef.current?.disconnect();
+    analyserRef.current = null;
+    sampleBufferRef.current = null;
+    void audioContextRef.current?.close();
+    audioContextRef.current = null;
+    setAudioLevel(0);
   }, []);
 
   useEffect(() => () => cleanup(), [cleanup]);
@@ -81,6 +98,7 @@ export function useVoiceTranscription(
     setRejection(null);
     setFinalText(null);
     setPartialText("");
+    setAudioLevel(0);
 
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
       setState("error");
@@ -92,6 +110,30 @@ export function useVoiceTranscription(
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
+
+      const audioContext = new AudioContext();
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 128;
+      const source = audioContext.createMediaStreamSource(stream);
+      source.connect(analyser);
+      audioContextRef.current = audioContext;
+      analyserRef.current = analyser;
+      sampleBufferRef.current = new Uint8Array(analyser.frequencyBinCount);
+
+      const updateAudioLevel = () => {
+        const activeAnalyser = analyserRef.current;
+        const activeBuffer = sampleBufferRef.current;
+        if (!activeAnalyser || !activeBuffer) {
+          setAudioLevel(0);
+          return;
+        }
+        activeAnalyser.getByteFrequencyData(activeBuffer);
+        const average =
+          activeBuffer.reduce((sum, value) => sum + value, 0) / (activeBuffer.length * 255);
+        setAudioLevel(Math.min(1, average * 1.8));
+        levelAnimationRef.current = window.requestAnimationFrame(updateAudioLevel);
+      };
+      levelAnimationRef.current = window.requestAnimationFrame(updateAudioLevel);
 
       const socket = new WebSocket(wsUrl(language));
       socket.binaryType = "arraybuffer";
@@ -122,14 +164,18 @@ export function useVoiceTranscription(
           } else if (payload.type === "final") {
             setFinalText(payload.text ?? "");
             setState("idle");
+            cleanup();
           } else if (payload.type === "rejected") {
             setRejection({
               message: payload.message ?? "That input couldn't be used.",
               safeAlternative: payload.safe_alternative ?? null,
             });
             setState("idle");
+            cleanup();
           } else if (payload.type === "error") {
             setErrorMessage(payload.message ?? "Transcription error.");
+            setState("error");
+            cleanup();
           }
         } catch {
           // Ignore malformed frames rather than surfacing a raw parse error.
@@ -139,15 +185,19 @@ export function useVoiceTranscription(
       socket.onerror = () => {
         setState("error");
         setErrorMessage("Voice connection failed.");
+        cleanup();
       };
       socket.onclose = () => {
-        recorderRef.current?.stream.getTracks().forEach((track) => track.stop());
+        if (socketRef.current === socket) {
+          cleanup();
+        }
       };
     } catch {
       setState("error");
       setErrorMessage("Microphone access was denied or unavailable.");
+      cleanup();
     }
-  }, [chunkIntervalMs, language]);
+  }, [chunkIntervalMs, cleanup, language]);
 
   const stop = useCallback(() => {
     setState("stopping");
@@ -158,5 +208,5 @@ export function useVoiceTranscription(
     }
   }, []);
 
-  return { state, partialText, finalText, rejection, errorMessage, start, stop };
+  return { state, partialText, finalText, rejection, errorMessage, audioLevel, start, stop };
 }

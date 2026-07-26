@@ -19,9 +19,9 @@ export function OnboardingFlow({ onStoryReady }: { onStoryReady: (storyId: strin
   const [cast, setCast] = useState<CastCharacter[]>([]);
 
   return (
-    <section className="mx-auto max-w-2xl rounded-xl border border-stone-700 bg-[#191724] p-8">
-      <p className="font-mono text-xs uppercase tracking-[0.16em] text-teal-300">Start a story</p>
-      <h1 className="mt-3 text-2xl font-semibold">
+    <section className="mx-auto max-w-3xl rounded-[28px] border border-stone-700/80 bg-[radial-gradient(circle_at_top,rgba(45,212,191,0.08),transparent_26%),linear-gradient(180deg,rgba(25,23,36,0.98),rgba(18,17,29,0.98))] p-8 shadow-[0_28px_70px_rgba(0,0,0,0.35)] md:p-10">
+      <p className="font-mono text-xs uppercase tracking-[0.24em] text-teal-300">Start a story</p>
+      <h1 className="mt-4 text-3xl font-semibold tracking-[-0.03em] text-stone-50 md:text-[2.15rem]">
         {step === "seed" && "What do you want to write about?"}
         {step === "template" && "Pick a starting point"}
         {step === "language" && "Choose a language"}
@@ -30,7 +30,7 @@ export function OnboardingFlow({ onStoryReady }: { onStoryReady: (storyId: strin
         {step === "cast-lock" && "Ready to begin"}
       </h1>
 
-      <div className="mt-6">
+      <div className="mt-8">
         {step === "seed" && (
           <SeedForm
             onContinue={(value) => {
