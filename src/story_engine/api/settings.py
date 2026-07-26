@@ -51,6 +51,14 @@ class RuntimeSettings(BaseModel):
     openai_tts_model: str = Field(default="tts-1", min_length=1, max_length=100)
     narrator_voice: str = Field(default="alloy", min_length=1, max_length=64)
     indicf5_base_url: str | None = None
+    # IndicF5 zero-shot synthesis on a non-CUDA device (MPS/CPU) has been
+    # observed running well below real-time (e.g. ~15x slower than the
+    # clip's own duration on Apple Silicon MPS) — a single longer dialogue
+    # line can legitimately take a couple of minutes. This is only ever hit
+    # from `services/narration_jobs.py`'s background thread, never inline in
+    # an HTTP request, so a generous timeout costs nothing but wall-clock
+    # time on that thread.
+    indicf5_timeout_seconds: float = Field(default=1200.0, gt=0)
 
     @property
     def database_resource_bound(self) -> bool:
@@ -100,4 +108,5 @@ def load_settings() -> RuntimeSettings:
         openai_tts_model=os.getenv("OPENAI_TTS_MODEL", "tts-1"),
         narrator_voice=os.getenv("NARRATOR_VOICE", "alloy"),
         indicf5_base_url=os.getenv("INDICF5_BASE_URL"),
+        indicf5_timeout_seconds=float(os.getenv("INDICF5_TIMEOUT_SECONDS", "1200")),
     )

@@ -14,7 +14,7 @@ export function Sidebar({
       aria-label="Primary"
       className="hidden w-60 shrink-0 border-r border-stone-700 bg-[#191724] p-4 md:block"
     >
-      <p className="font-mono text-xs uppercase tracking-[0.2em] text-teal-300">Story Engine</p>
+      <p className="font-mono text-xs uppercase tracking-[0.2em] text-teal-300">Brahma</p>
       <ul className="mt-6 space-y-1">
         {ROUTES.map((route) => {
           const isActive = pathname === route.path;

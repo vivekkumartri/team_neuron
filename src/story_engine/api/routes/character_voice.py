@@ -99,7 +99,10 @@ def _synthesize_and_respond(
     raw_text: str, settings: RuntimeSettings, user: AuthenticatedUser
 ) -> CharacterAudioResponse:
     provider = OpenAIResponsesProvider(api_key=settings.openai_api_key or "")
-    tts = IndicF5Provider(base_url=settings.indicf5_base_url or "")
+    tts = IndicF5Provider(
+        base_url=settings.indicf5_base_url or "",
+        timeout_seconds=settings.indicf5_timeout_seconds,
+    )
     overrides = list_character_voices(str(user.id))
 
     try:
@@ -190,7 +193,10 @@ def start_chapter_narration(chapter_id: UUID, user: CurrentUser) -> NarrationSta
         text = published_chapter_text(connection, chapter_id)
 
     provider = OpenAIResponsesProvider(api_key=settings.openai_api_key or "")
-    tts = IndicF5Provider(base_url=settings.indicf5_base_url or "")
+    tts = IndicF5Provider(
+        base_url=settings.indicf5_base_url or "",
+        timeout_seconds=settings.indicf5_timeout_seconds,
+    )
     overrides = list_character_voices(str(user.id))
 
     job = start_job(

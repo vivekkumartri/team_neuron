@@ -39,7 +39,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="flex-1">
           <header className="flex items-center justify-between border-b border-stone-700 p-4 md:hidden">
             <p className="font-mono text-xs uppercase tracking-[0.2em] text-teal-300">
-              Story Engine
+              Brahma
             </p>
             <button
               type="button"

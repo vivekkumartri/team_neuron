@@ -1,4 +1,4 @@
-# Running Story Engine locally (Docker Postgres, no Databricks)
+# Running Brahma locally (Docker Postgres, no Databricks)
 
 This is a local-only path for development before deploying to Databricks.
 It reuses the exact same code as production — no separate "local app" — via

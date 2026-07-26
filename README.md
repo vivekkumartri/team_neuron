@@ -1,6 +1,6 @@
-# Story Engine
+# Brahma
 
-Story Engine is a multi-tenant, agent-assisted branching-story application.
+Brahma is a multi-tenant, agent-assisted branching-story application.
 
 ## Specifications
 

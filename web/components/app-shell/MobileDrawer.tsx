@@ -44,7 +44,7 @@ export function MobileDrawer({
       />
       <nav className="relative z-50 h-full w-72 bg-[#191724] p-4 shadow-xl">
         <div className="flex items-center justify-between">
-          <p className="font-mono text-xs uppercase tracking-[0.2em] text-teal-300">Story Engine</p>
+          <p className="font-mono text-xs uppercase tracking-[0.2em] text-teal-300">Brahma</p>
           <button
             ref={closeButtonRef}
             type="button"

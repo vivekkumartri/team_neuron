@@ -1,7 +1,7 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "Story Engine",
+  title: "Brahma",
   description: "AI-assisted branching story generation.",
 };
 
