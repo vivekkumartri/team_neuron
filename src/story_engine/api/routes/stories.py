@@ -43,7 +43,6 @@ class CastMemberInput(BaseModel):
     voice: str = Field(default="", max_length=200)
     traits: str = Field(default="", max_length=200)
     visual: str = Field(default="", max_length=200)
-    is_protagonist: bool = False
 
 
 class CastProposalInput(BaseModel):
@@ -72,8 +71,9 @@ class StoryInput(BaseModel):
     # a 422 rather than silently defaulting to English.
     language: StoryLanguage = StoryLanguage.ENGLISH
     # Optional full edited cast from the cast-setup screen (task.md Task
-    # 4H.2 gap closure). When omitted/empty, behavior is unchanged from
-    # before: a single "Protagonist" entity is created (see below).
+    # 4H.2 gap closure). When omitted/empty, a single "Main Character"
+    # entity is created instead (see below) — no character is ever a
+    # protagonist, this is just a plain default name for the solo case.
     cast: list[CastMemberInput] = Field(default_factory=list, max_length=6)
 
 
@@ -209,21 +209,12 @@ def create_story(payload: StoryInput, user: CurrentUser) -> StoryResponse:
                     )
             focal_id: UUID | None = None
             if cast_input:
-                # One `entities` row per author-edited character, not just a
-                # single hardcoded protagonist (task.md Task 4H.2 gap
-                # closure). The protagonist-flagged character is always
-                # inserted FIRST regardless of its position in the payload,
-                # so it is also the "earliest created character entity" that
-                # `list_stories` and `cast.py`'s lock-cast role assignment
-                # both use as their focal/protagonist signal — no separate
-                # `is_protagonist` column needed on `entities`.
-                protagonist_index = next(
-                    (i for i, member in enumerate(cast_input) if member.is_protagonist), 0
-                )
-                ordered_cast = [cast_input[protagonist_index]] + [
-                    member for i, member in enumerate(cast_input) if i != protagonist_index
-                ]
-                for index, member in enumerate(ordered_cast):
+                # One `entities` row per author-edited character, in the
+                # order the author listed them — no character is singled out
+                # as a protagonist. The first entity created is used as the
+                # initial focal character purely so chapter 1 has somewhere
+                # to start; that's an ordering convenience, not a role.
+                for index, member in enumerate(cast_input):
                     cursor.execute(
                         "INSERT INTO entities (story_id, name, entity_type, founding_branch_id) "
                         "VALUES (%s, %s, 'character', %s) RETURNING id",
@@ -235,7 +226,7 @@ def create_story(payload: StoryInput, user: CurrentUser) -> StoryResponse:
             else:
                 cursor.execute(
                     "INSERT INTO entities (story_id, name, entity_type, founding_branch_id) "
-                    "VALUES (%s, 'Protagonist', 'character', %s) RETURNING id",
+                    "VALUES (%s, 'Main Character', 'character', %s) RETURNING id",
                     (story_id, branch_id),
                 )
                 focal_id = UUID(str(cast(tuple[object, ...], cursor.fetchone())[0]))

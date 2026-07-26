@@ -89,10 +89,11 @@ class OpenAIVoiceProvider:
         fields = {"model": model, "response_format": "json"}
         if language:
             fields["language"] = language
+        extension = content_type.split("/", 1)[-1].split(";")[0].strip() or "webm"
         body, boundary = _multipart_body(
             fields=fields,
             file_field="file",
-            filename="chunk.webm",
+            filename=f"chunk.{extension}",
             file_bytes=audio_bytes,
             content_type=content_type,
         )

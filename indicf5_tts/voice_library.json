@@ -1,0 +1,141 @@
+{
+  "_comment": "Curated reference-voice archetypes for zero-shot cloning via IndicF5. No entry here is a real/identifiable person's recording — each is a generic sample clip used only as a style/timbre reference. `ref_text` MUST be the exact transcript of what is spoken in `file`; if you add a new clip, verify its transcript (e.g. via the existing Whisper adapter in agents/voice_provider.py) before using it, since a wrong ref_text degrades cloning quality rather than just being cosmetically wrong.",
+  "voices": [
+    {
+      "id": "narrator_female_warm",
+      "file": "prompts/PAN_F_HAPPY_00001.wav",
+      "gender": "female",
+      "age_group": "adult",
+      "tone": "warm, expressive",
+      "ref_text": "ਭਹੰਪੀ ਵਿੱਚ ਸਮਾਰਕਾਂ ਦੇ ਭਵਨ ਨਿਰਮਾਣ ਕਲਾ ਦੇ ਵੇਰਵੇ ਗੁੰਝਲਦਾਰ ਅਤੇ ਹੈਰਾਨ ਕਰਨ ਵਾਲੇ ਹਨ, ਜੋ ਮੈਨੂੰ ਖੁਸ਼ ਕਰਦੇ ਹਨ।"
+    },
+    {
+      "id": "young_female_bright",
+      "file": "prompts/PAN_F_HAPPY_00002.wav",
+      "gender": "female",
+      "age_group": "young",
+      "tone": "bright, energetic",
+      "ref_text": null
+    },
+    {
+      "id": "female_measured",
+      "file": "prompts/MAR_F_WIKI_00001.wav",
+      "gender": "female",
+      "age_group": "adult",
+      "tone": "measured, informative",
+      "ref_text": null
+    },
+    {
+      "id": "female_gentle",
+      "file": "prompts/MAR_F_HAPPY_00001.wav",
+      "gender": "female",
+      "age_group": "adult",
+      "tone": "gentle, kind",
+      "ref_text": null
+    },
+    {
+      "id": "male_measured",
+      "file": "prompts/MAR_M_WIKI_00001.wav",
+      "gender": "male",
+      "age_group": "adult",
+      "tone": "measured, authoritative",
+      "ref_text": null
+    },
+    {
+      "id": "female_stern",
+      "file": "prompts/KAN_F_HAPPY_00001.wav",
+      "gender": "female",
+      "age_group": "adult",
+      "tone": "stern, blunt",
+      "ref_text": null
+    },
+    {
+      "id": "female_wistful",
+      "file": "prompts/TAM_F_HAPPY_00001.wav",
+      "gender": "female",
+      "age_group": "young",
+      "tone": "soft, wistful",
+      "ref_text": null
+    },
+    {
+      "id": "female_local_samantha",
+      "file": "prompts/female_local_samantha.wav",
+      "gender": "female",
+      "age_group": "adult",
+      "tone": "warm, clear",
+      "ref_text": "This is a short reference recording used to clone this character's voice for narration."
+    },
+    {
+      "id": "female_local_karen",
+      "file": "prompts/female_local_karen.wav",
+      "gender": "female",
+      "age_group": "adult",
+      "tone": "bright, friendly",
+      "ref_text": "This is a short reference recording used to clone this character's voice for narration."
+    },
+    {
+      "id": "female_local_kathy",
+      "file": "prompts/female_local_kathy.wav",
+      "gender": "female",
+      "age_group": "young",
+      "tone": "energetic, light",
+      "ref_text": "This is a short reference recording used to clone this character's voice for narration."
+    },
+    {
+      "id": "female_local_moira",
+      "file": "prompts/female_local_moira.wav",
+      "gender": "female",
+      "age_group": "adult",
+      "tone": "measured, soft",
+      "ref_text": "This is a short reference recording used to clone this character's voice for narration."
+    },
+    {
+      "id": "female_local_tara",
+      "file": "prompts/female_local_tara.wav",
+      "gender": "female",
+      "age_group": "young",
+      "tone": "warm, gentle",
+      "ref_text": "This is a short reference recording used to clone this character's voice for narration."
+    },
+    {
+      "id": "male_local_daniel",
+      "file": "prompts/male_local_daniel.wav",
+      "gender": "male",
+      "age_group": "adult",
+      "tone": "measured, authoritative",
+      "ref_text": "This is a short reference recording used to clone this character's voice for narration."
+    },
+    {
+      "id": "male_local_aman",
+      "file": "prompts/male_local_aman.wav",
+      "gender": "male",
+      "age_group": "adult",
+      "tone": "warm, steady",
+      "ref_text": "This is a short reference recording used to clone this character's voice for narration."
+    },
+    {
+      "id": "male_local_rishi",
+      "file": "prompts/male_local_rishi.wav",
+      "gender": "male",
+      "age_group": "young",
+      "tone": "bright, energetic",
+      "ref_text": "This is a short reference recording used to clone this character's voice for narration."
+    },
+    {
+      "id": "male_local_fred",
+      "file": "prompts/male_local_fred.wav",
+      "gender": "male",
+      "age_group": "elder",
+      "tone": "gravelly, quirky",
+      "ref_text": "This is a short reference recording used to clone this character's voice for narration."
+    },
+    {
+      "id": "male_local_ralph",
+      "file": "prompts/male_local_ralph.wav",
+      "gender": "male",
+      "age_group": "elder",
+      "tone": "stern, gruff",
+      "ref_text": "This is a short reference recording used to clone this character's voice for narration."
+    }
+  ]
+}

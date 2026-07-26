@@ -8,6 +8,7 @@ import { ActivityFeed } from "./ActivityFeed";
 import { AgentCoordinationCanvas } from "./AgentCoordinationCanvas";
 import { BranchControls, type ProgressionMode } from "./BranchControls";
 import { type QuotaBannerState } from "./QuotaBanner";
+import { ChapterNarrationTab } from "../../shared/ChapterNarrationTab";
 import { VoiceInputButton } from "../../shared/VoiceInputButton";
 
 interface ProgressionResponse {
@@ -50,6 +51,12 @@ interface CastMemberResponse {
   role: string;
 }
 
+interface BranchSummary {
+  id: string;
+  name: string;
+  parent_branch_id: string | null;
+}
+
 const MODE_TO_API: Record<ProgressionMode, "CONTINUE" | "EDIT_TRAITS" | "REWIND"> = {
   continue: "CONTINUE",
   "edit-traits": "EDIT_TRAITS",
@@ -80,8 +87,29 @@ export function WorkspaceView({ branchId }: { branchId: string }) {
   const [newCharacterName, setNewCharacterName] = useState("");
   const [castBusy, setCastBusy] = useState(false);
   const [castError, setCastError] = useState<string | null>(null);
+  const [chapterTab, setChapterTab] = useState<"story" | "narration">("story");
+  const [mainTab, setMainTab] = useState<"story" | "characters">("story");
+  const [branch, setBranch] = useState<BranchSummary | null>(null);
 
   const { events, connectionState, complete } = useGenerationStream(jobId);
+
+  // Surfaces the branch's own name (e.g. "Ch. 1 (Branch B)" for a rewind
+  // branch — see `progression.py`) so it's actually visible which timeline
+  // you're on, instead of only existing as an opaque id in localStorage.
+  useEffect(() => {
+    if (!branchId) return;
+    let cancelled = false;
+    apiFetch<BranchSummary>(`/branches/${branchId}`)
+      .then((data) => {
+        if (!cancelled) setBranch(data);
+      })
+      .catch(() => {
+        if (!cancelled) setBranch(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [branchId]);
 
   const refreshCast = useCallback(async () => {
     if (!branchId) return;
@@ -171,6 +199,7 @@ export function WorkspaceView({ branchId }: { branchId: string }) {
         setLatestChapter(detail);
         setChapterId(detail.id);
         setChapterLoadError(null);
+        setChapterTab("story");
       } catch {
         if (!cancelled) {
           setChapterLoadError("Couldn't load the chapter text. It may still be publishing.");
@@ -291,6 +320,8 @@ export function WorkspaceView({ branchId }: { branchId: string }) {
               try {
                 const detail = await apiFetch<ChapterDetail>(`/chapters/${chapter.id}`);
                 setLatestChapter(detail);
+                setChapterLoadError(null);
+                setChapterTab("story");
               } catch {
                 setChapterLoadError("Couldn't load that chapter.");
               }
@@ -335,19 +366,137 @@ export function WorkspaceView({ branchId }: { branchId: string }) {
   }
 
   return (
-    <section className="mx-auto grid max-w-7xl gap-6 lg:grid-cols-[1fr_340px]">
+    <section className="mx-auto max-w-7xl space-y-6">
+      {branch && (
+        <p className="font-mono text-xs uppercase tracking-[0.14em] text-stone-500">
+          {branch.name}
+        </p>
+      )}
+      <div className="flex overflow-hidden rounded-lg border border-stone-700 text-xs w-fit">
+        <button
+          type="button"
+          onClick={() => setMainTab("story")}
+          aria-current={mainTab === "story" ? "page" : undefined}
+          className={`px-4 py-2 ${mainTab === "story" ? "bg-teal-950/40 text-teal-200" : "text-stone-300"}`}
+        >
+          Story
+        </button>
+        <button
+          type="button"
+          onClick={() => setMainTab("characters")}
+          aria-current={mainTab === "characters" ? "page" : undefined}
+          className={`px-4 py-2 ${mainTab === "characters" ? "bg-teal-950/40 text-teal-200" : "text-stone-300"}`}
+        >
+          Characters {cast.length > 0 ? `(${cast.length})` : ""}
+        </button>
+      </div>
+
+      {mainTab === "characters" ? (
+        <div className="mx-auto max-w-2xl rounded-xl border border-stone-700 bg-[#191724] p-6">
+          <p className="font-mono text-xs uppercase tracking-[0.16em] text-teal-300">Cast</p>
+          <p className="mt-1 text-sm text-stone-400">
+            Add or remove characters here — the next chapter you generate only ever draws on
+            whoever is currently in this list.
+          </p>
+          <ul className="mt-4 space-y-2">
+            {cast.map((member) => (
+              <li
+                key={member.entity_id}
+                className="flex items-center justify-between gap-2 rounded-lg border border-stone-700 p-3 text-sm"
+              >
+                <span>{member.name}</span>
+                <button
+                  type="button"
+                  disabled={castBusy || cast.length <= 1}
+                  onClick={() => void removeCharacter(member.entity_id)}
+                  title={cast.length <= 1 ? "A story needs at least one character" : undefined}
+                  className="text-xs text-rose-300 underline underline-offset-4 disabled:opacity-40"
+                >
+                  Remove
+                </button>
+              </li>
+            ))}
+            {cast.length === 0 && <li className="text-sm text-stone-400">No cast loaded yet.</li>}
+          </ul>
+          <div className="mt-4 flex gap-2">
+            <input
+              value={newCharacterName}
+              onChange={(event) => setNewCharacterName(event.target.value)}
+              placeholder="New character name"
+              className="min-w-0 flex-1 rounded-lg border border-stone-700 bg-[#11101a] p-2 text-sm"
+              onKeyDown={(event) => {
+                if (event.key === "Enter") void addCharacter();
+              }}
+            />
+            <button
+              type="button"
+              disabled={castBusy || !newCharacterName.trim()}
+              onClick={() => void addCharacter()}
+              className="rounded-lg border border-teal-300/60 px-3 py-2 text-sm text-teal-200 disabled:opacity-40"
+            >
+              Add
+            </button>
+          </div>
+          {castError && (
+            <p role="alert" className="mt-2 text-sm text-rose-300">
+              {castError}
+            </p>
+          )}
+        </div>
+      ) : (
+    <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
       <article className="rounded-xl border border-stone-700 bg-[#191724] p-6">
         {chapterTreeStrip && <div className="mb-4">{chapterTreeStrip}</div>}
         {jobId && complete && succeeded && (
-          <div className="mb-4 rounded-lg border border-teal-400/50 bg-teal-950/20 p-4 text-sm text-teal-100">
-            <p className="mb-2">
-              {latestChapter
-                ? `Chapter ${latestChapter.chapter_index} is ready. Use the controls below to continue the story, edit traits, or rewind.`
-                : "Chapter is ready. Loading the text…"}
-            </p>
-            {chapterLoadError && <p className="text-rose-300">{chapterLoadError}</p>}
-            {latestChapter && (
-              <div className="mt-3 space-y-3 rounded-lg border border-stone-700 bg-[#11101a] p-4 text-stone-100">
+          <p className="mb-4 rounded-lg border border-teal-400/50 bg-teal-950/20 p-3 text-sm text-teal-100">
+            {latestChapter
+              ? `Chapter ${latestChapter.chapter_index} is ready. Use the controls below to continue the story, edit traits, or rewind.`
+              : "Chapter is ready. Loading the text…"}
+          </p>
+        )}
+        {jobId && complete && !succeeded && (
+          <p className="mb-4 rounded-lg border border-rose-400/50 bg-rose-950/20 p-3 text-sm text-rose-100">
+            Generation didn&apos;t finish successfully (the evaluator rejected the candidate, or
+            the request failed/timed out). Nothing was published — try Continue again.
+          </p>
+        )}
+        {chapterLoadError && (
+          <p className="mb-4 text-sm text-rose-300">{chapterLoadError}</p>
+        )}
+        {/* Whatever chapter is currently selected — the one a job just published, or one
+            picked from "Story so far" above — stays visible here regardless of job state,
+            so an author can browse back to any previous chapter's full text at any time. */}
+        {latestChapter && (
+          <div className="mb-6">
+            <div className="mb-3 flex items-center justify-between">
+              <p className="font-mono text-xs uppercase tracking-[0.16em] text-violet-300">
+                Chapter {latestChapter.chapter_index}
+              </p>
+              {latestChapter.status === "PUBLISHED" && (
+                <div className="flex overflow-hidden rounded-lg border border-stone-700 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setChapterTab("story")}
+                    aria-current={chapterTab === "story" ? "page" : undefined}
+                    className={`px-3 py-2 ${chapterTab === "story" ? "bg-teal-950/40 text-teal-200" : "text-stone-300"}`}
+                  >
+                    Story
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setChapterTab("narration")}
+                    aria-current={chapterTab === "narration" ? "page" : undefined}
+                    className={`px-3 py-2 ${chapterTab === "narration" ? "bg-teal-950/40 text-teal-200" : "text-stone-300"}`}
+                  >
+                    Narration
+                  </button>
+                </div>
+              )}
+            </div>
+            {chapterTab === "narration" && latestChapter.status === "PUBLISHED" ? (
+              <ChapterNarrationTab chapterId={latestChapter.id} />
+            ) : (
+              <div className="space-y-3 rounded-lg border border-stone-700 bg-[#11101a] p-4 text-stone-100">
                 {latestChapter.scenes.map((scene) => (
                   <div key={scene.scene_index}>
                     <p className="whitespace-pre-wrap leading-relaxed">{scene.summary}</p>
@@ -363,12 +512,6 @@ export function WorkspaceView({ branchId }: { branchId: string }) {
               </div>
             )}
           </div>
-        )}
-        {jobId && complete && !succeeded && (
-          <p className="mb-4 rounded-lg border border-rose-400/50 bg-rose-950/20 p-3 text-sm text-rose-100">
-            Generation didn&apos;t finish successfully (the evaluator rejected the candidate, or
-            the request failed/timed out). Nothing was published — try Continue again.
-          </p>
         )}
         <p className="font-mono text-xs uppercase tracking-[0.16em] text-violet-300">
           Advance this branch
@@ -392,19 +535,19 @@ export function WorkspaceView({ branchId }: { branchId: string }) {
               <option value="">Select a character…</option>
               {cast.map((member) => (
                 <option key={member.entity_id} value={member.entity_id}>
-                  {member.name} {member.role === "PROTAGONIST" ? "(protagonist)" : ""}
+                  {member.name}
                 </option>
               ))}
             </select>
           </label>
           <label className="block text-sm sm:col-span-2">
             Trait change (only used for "Edit traits")
-            <input
-              value={traitChange}
-              onChange={(event) => setTraitChange(event.target.value)}
-              className="mt-1 w-full rounded-lg border border-stone-700 bg-[#11101a] p-2 text-sm"
-            />
-            <div className="mt-2">
+            <div className="relative mt-1">
+              <input
+                value={traitChange}
+                onChange={(event) => setTraitChange(event.target.value)}
+                className="w-full rounded-lg border border-stone-700 bg-[#11101a] p-2 pr-12 text-sm"
+              />
               <VoiceInputButton
                 label="Speak trait change"
                 onTranscript={(text) =>
@@ -453,56 +596,8 @@ export function WorkspaceView({ branchId }: { branchId: string }) {
           )}
         </div>
       </aside>
-      <aside className="rounded-xl border border-stone-700 bg-[#191724] p-4 lg:col-start-2">
-        <p className="font-mono text-xs uppercase tracking-[0.16em] text-teal-300">Cast</p>
-        <ul className="mt-3 space-y-2">
-          {cast.map((member) => (
-            <li
-              key={member.entity_id}
-              className="flex items-center justify-between gap-2 rounded-lg border border-stone-700 p-2 text-sm"
-            >
-              <span>
-                {member.name}
-                {member.role === "PROTAGONIST" && (
-                  <span className="ml-2 text-xs text-amber-300">Protagonist</span>
-                )}
-              </span>
-              {member.role !== "PROTAGONIST" && (
-                <button
-                  type="button"
-                  disabled={castBusy}
-                  onClick={() => void removeCharacter(member.entity_id)}
-                  className="text-xs text-rose-300 underline underline-offset-4 disabled:opacity-40"
-                >
-                  Remove
-                </button>
-              )}
-            </li>
-          ))}
-          {cast.length === 0 && <li className="text-sm text-stone-400">No cast loaded yet.</li>}
-        </ul>
-        <div className="mt-4 flex gap-2">
-          <input
-            value={newCharacterName}
-            onChange={(event) => setNewCharacterName(event.target.value)}
-            placeholder="New character name"
-            className="min-w-0 flex-1 rounded-lg border border-stone-700 bg-[#11101a] p-2 text-sm"
-          />
-          <button
-            type="button"
-            disabled={castBusy || !newCharacterName.trim()}
-            onClick={() => void addCharacter()}
-            className="rounded-lg border border-teal-300/60 px-3 py-2 text-sm text-teal-200 disabled:opacity-40"
-          >
-            Add
-          </button>
-        </div>
-        {castError && (
-          <p role="alert" className="mt-2 text-sm text-rose-300">
-            {castError}
-          </p>
-        )}
-      </aside>
+    </div>
+      )}
     </section>
   );
 }

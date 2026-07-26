@@ -6,10 +6,10 @@ then serves POST /generate requests. Each request generates audio and saves it
 to disk under outputs/, and returns the file (plus timing info in headers).
 
 Run:
-    uvicorn api_server:app --host 0.0.0.0 --port 8000
+    uvicorn api_server:app --host 0.0.0.0 --port 8001
 
 Then, e.g.:
-    curl -X POST http://localhost:8000/generate \
+    curl -X POST http://localhost:8001/generate \
       -H "Content-Type: application/json" \
       -d '{
             "text": "नमस्ते! आप कैसे हैं?",
@@ -182,4 +182,4 @@ def generate(req: GenerateRequest):
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8001)

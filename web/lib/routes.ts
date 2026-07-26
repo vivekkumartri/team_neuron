@@ -7,12 +7,7 @@
  * table — there is no Next.js dynamic routing at runtime.
  */
 
-export type RouteId =
-  | "onboarding"
-  | "workspace"
-  | "world"
-  | "endings"
-  | "reports";
+export type RouteId = "onboarding" | "workspace" | "voice";
 
 export interface RouteDefinition {
   id: RouteId;
@@ -25,9 +20,7 @@ export interface RouteDefinition {
 export const ROUTES: readonly RouteDefinition[] = [
   { id: "onboarding", path: "/onboarding", label: "Start a story", protected: false },
   { id: "workspace", path: "/workspace", label: "Workspace", protected: true },
-  { id: "world", path: "/world", label: "World", protected: true },
-  { id: "endings", path: "/endings", label: "Endings", protected: true },
-  { id: "reports", path: "/reports", label: "Reports", protected: true },
+  { id: "voice", path: "/voice", label: "Voice agent", protected: true },
 ];
 
 export function matchRoute(pathname: string): RouteDefinition | undefined {

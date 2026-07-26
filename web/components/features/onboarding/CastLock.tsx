@@ -45,6 +45,14 @@ export function CastLock({
       if (!story.initial_branch_id || !story.initial_focal_entity_id) {
         throw new Error("The story did not receive its initial branch.");
       }
+      // `POST /stories` creates the character `entities` but never touches
+      // `cast_members` — locking the cast is a separate step
+      // (`POST /stories/:id/cast-lock`, `api/routes/cast.py`) that this
+      // screen's "Lock cast" button never actually called. Without it,
+      // `cast_members` stayed empty for every story created through this
+      // flow, which is why the workspace's "Focal character" dropdown (and
+      // the Cast panel) always showed no options despite characters existing.
+      await apiFetch(`/stories/${story.id}/cast-lock`, { method: "POST" });
       // Stored so `VoiceInputButton` instances elsewhere in the app (which
       // don't otherwise have the current story object in scope) can pass a
       // language hint to `WS /api/v1/voice/transcribe` — the same

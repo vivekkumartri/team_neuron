@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { apiFetch } from "../../../lib/api-client";
+import { CharacterVoiceUploadField } from "../../shared/CharacterVoiceUploadField";
 import type { StoryLanguageCode } from "./LanguagePicker";
 
 export interface CastCharacter {
@@ -11,23 +12,30 @@ export interface CastCharacter {
   voice: string;
   traits: string;
   visual: string;
-  is_protagonist: boolean;
 }
 
 interface CastProposalResponse {
-  characters: Omit<CastCharacter, "is_protagonist">[];
+  characters: CastCharacter[];
   source: "llm" | "seed_fallback";
 }
 
-const blankCharacter = (isProtagonist = false): CastCharacter => ({
+const blankCharacter = (): CastCharacter => ({
   name: "",
-  role: isProtagonist ? "Protagonist" : "Supporting character",
+  role: "",
   voice: "",
   traits: "",
   visual: "",
-  is_protagonist: isProtagonist,
 });
 
+/**
+ * No character is a "protagonist" here — every cast member is equal, both
+ * in this editor and downstream (`cast_members.role` is always 'CHARACTER',
+ * `POST /stories`'s `CastMemberInput` no longer has an `is_protagonist`
+ * field at all). The first character listed is still used as chapter 1's
+ * initial focal character, purely as an ordering convenience to give
+ * generation somewhere to start — it carries no special status and can be
+ * reordered or removed like any other.
+ */
 export function CastEditor({
   seed,
   language,
@@ -50,16 +58,11 @@ export function CastEditor({
         method: "POST",
         body: { seed, language },
       });
-      setCast(
-        proposal.characters.map((character, index) => ({
-          ...character,
-          is_protagonist: index === 0,
-        })),
-      );
+      setCast(proposal.characters);
       setUsingFallback(proposal.source === "seed_fallback");
     } catch {
       setError("We couldn't generate a cast just now. You can try again or build it yourself.");
-      setCast((current) => (current.length ? current : [blankCharacter(true)]));
+      setCast((current) => (current.length ? current : [blankCharacter()]));
       setUsingFallback(true);
     } finally {
       setLoading(false);
@@ -70,20 +73,10 @@ export function CastEditor({
     void generate();
   }, [generate]);
 
-  const update = (index: number, field: keyof CastCharacter, value: string | boolean) => {
+  const update = (index: number, field: keyof CastCharacter, value: string) => {
     setCast((current) =>
       current.map((character, characterIndex) =>
-        characterIndex === index
-          ? {
-              ...character,
-              [field]: value,
-              ...(field === "is_protagonist" && value
-                ? { is_protagonist: true }
-                : {}),
-            }
-          : field === "is_protagonist" && value
-            ? { ...character, is_protagonist: false }
-            : character,
+        characterIndex === index ? { ...character, [field]: value } : character,
       ),
     );
   };
@@ -119,7 +112,7 @@ export function CastEditor({
         {cast.map((character, index) => (
           <fieldset key={`${index}-${character.name}`} className="rounded-xl border border-stone-700 bg-[#11101a] p-4">
             <legend className="px-1 text-xs font-medium uppercase tracking-wide text-teal-300">
-              {character.is_protagonist ? "Protagonist" : "Starting character"}
+              Character
             </legend>
             {(["name", "role", "voice", "traits", "visual"] as const).map((field) => (
               <label key={field} className="mt-3 block text-xs capitalize text-stone-400">
@@ -131,15 +124,7 @@ export function CastEditor({
                 />
               </label>
             ))}
-            <label className="mt-3 flex items-center gap-2 text-sm text-stone-300">
-              <input
-                type="radio"
-                name="protagonist"
-                checked={character.is_protagonist}
-                onChange={() => update(index, "is_protagonist", true)}
-              />
-              Make protagonist
-            </label>
+            <CharacterVoiceUploadField characterName={character.name} />
             {cast.length > 1 && (
               <button
                 type="button"
@@ -165,7 +150,7 @@ export function CastEditor({
       <button
         type="button"
         disabled={!validCast || loading}
-        onClick={() => onContinue(cast.map((character, index) => ({ ...character, is_protagonist: character.is_protagonist || index === 0 })))}
+        onClick={() => onContinue(cast)}
         className="ml-3 rounded-lg bg-amber-300 px-4 py-3 font-medium text-stone-950 disabled:opacity-40"
       >
         Continue to cast lock

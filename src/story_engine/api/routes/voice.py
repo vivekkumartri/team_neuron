@@ -57,11 +57,23 @@ _MAX_UTTERANCE_CHARS = 8_000
 
 
 def _authenticate_websocket(websocket: WebSocket) -> tuple[str, str] | None:
-    """Mirror `authenticate_request`'s header contract for a WS handshake."""
+    """Mirror `authenticate_request`'s header contract for a WS handshake.
+
+    This previously mirrored only the *header-reading* half of
+    `authenticate_request`, not its `settings.local_dev_mode` fallback — so
+    locally (no Databricks Apps reverse proxy ever sets these headers) every
+    WS handshake failed the identity check and got closed immediately,
+    surfaced by the browser as a bare "WebSocket connection ... failed" with
+    no further detail. `authenticate_request` substitutes a fixed dev
+    identity in that case instead of 401ing every request; do the same here
+    so voice input actually works locally, exactly like every other route.
+    """
 
     databricks_user_id = websocket.headers.get("x-forwarded-user")
     email = websocket.headers.get("x-forwarded-email")
     if not databricks_user_id or not email:
+        if load_settings().local_dev_mode:
+            return "local-dev-user", "dev@localhost"
         return None
     return databricks_user_id, email
 

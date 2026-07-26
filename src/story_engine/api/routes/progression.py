@@ -134,11 +134,52 @@ def submit_progression(
                         status_code=status.HTTP_404_NOT_FOUND, detail="Branch not found"
                     )
                 story_id, arc_id, parent_name = cast(tuple[Any, ...], parent_row)
-                suffix = "trait-edit" if payload.mode is ProgressionMode.EDIT_TRAITS else "rewind"
+
+                forked_from_chapter_id: UUID | None = None
+                if payload.mode is ProgressionMode.REWIND:
+                    # Naming a rewind branch "(rewind)" told you nothing once
+                    # you had more than one — going back to chapter 1 twice
+                    # and regenerating each time produced two branches that
+                    # both just said "(rewind)", with no way to tell which
+                    # held the older alternate chapter 2 and which the newer.
+                    # `forked_from_chapter_id` (schema already has the
+                    # column, migration 0003) was also never being set here,
+                    # so nothing durably recorded which chapter a rewind
+                    # branch actually forked from. Fix both: record the fork
+                    # point, and label the branch "Ch. N — Branch B/C/..."
+                    # where the letter reflects how many earlier branches
+                    # already forked from that same chapter (the original
+                    # continuation is implicitly "Branch A" and keeps its
+                    # existing name/id — no retroactive rename needed for it
+                    # to stay recognizable as the first/oldest one).
+                    forked_from_chapter_id = payload.rewind_to_chapter_id
+                    cursor.execute(
+                        "SELECT chapter_index FROM chapters WHERE id = %s",
+                        (forked_from_chapter_id,),
+                    )
+                    chapter_row = cursor.fetchone()
+                    if chapter_row is None:
+                        raise HTTPException(
+                            status_code=status.HTTP_404_NOT_FOUND,
+                            detail="Rewind target chapter not found",
+                        )
+                    chapter_index = cast(tuple[Any, ...], chapter_row)[0]
+
+                    cursor.execute(
+                        "SELECT count(*) FROM branches WHERE forked_from_chapter_id = %s",
+                        (forked_from_chapter_id,),
+                    )
+                    sibling_count = cast(tuple[Any, ...], cursor.fetchone())[0]
+                    letter = chr(ord("A") + 1 + int(sibling_count))
+                    branch_name = f"{parent_name} — Ch. {chapter_index} (Branch {letter})"
+                else:
+                    branch_name = f"{parent_name} (trait-edit)"
+
                 cursor.execute(
-                    "INSERT INTO branches (story_id, arc_id, parent_branch_id, name, status) "
-                    "VALUES (%s, %s, %s, %s, 'ACTIVE') RETURNING id",
-                    (story_id, arc_id, branch_id, f"{parent_name} ({suffix})"),
+                    "INSERT INTO branches "
+                    "(story_id, arc_id, parent_branch_id, forked_from_chapter_id, name, status) "
+                    "VALUES (%s, %s, %s, %s, %s, 'ACTIVE') RETURNING id",
+                    (story_id, arc_id, branch_id, forked_from_chapter_id, branch_name),
                 )
                 target_branch_id = cast(tuple[Any, ...], cursor.fetchone())[0]
 

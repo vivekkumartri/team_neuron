@@ -3,7 +3,9 @@ __pycache__/
 *.pyc
 samples/*.wav
 outputs/*.wav
+outputs/narration_jobs/
 ref_uploads/*.wav
+ref_uploads/*/
 server.log
 ngrok.log
 .server.pid

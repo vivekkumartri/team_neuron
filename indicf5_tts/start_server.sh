@@ -6,14 +6,14 @@ cd "$(dirname "$0")"
 
 source .venv/bin/activate
 
-echo "==> Starting API server on :8000 (log: server.log)"
-nohup uvicorn api_server:app --host 0.0.0.0 --port 8000 > server.log 2>&1 &
+echo "==> Starting API server on :8001 (log: server.log)"
+nohup uvicorn api_server:app --host 0.0.0.0 --port 8001 > server.log 2>&1 &
 SERVER_PID=$!
 echo "    Server PID: $SERVER_PID"
 
 echo "==> Waiting for server to become healthy..."
 for i in $(seq 1 30); do
-    if curl -s http://localhost:8000/health > /dev/null 2>&1; then
+    if curl -s http://localhost:8001/health > /dev/null 2>&1; then
         echo "    Server is up."
         break
     fi
@@ -27,7 +27,7 @@ if ! command -v ngrok &> /dev/null; then
 fi
 
 echo "==> Starting ngrok tunnel (log: ngrok.log)"
-nohup ngrok http 8000 --log stdout > ngrok.log 2>&1 &
+nohup ngrok http 8001 --log stdout > ngrok.log 2>&1 &
 NGROK_PID=$!
 echo "    ngrok PID: $NGROK_PID"
 

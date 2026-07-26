@@ -16,6 +16,7 @@ from story_engine.api.routes.archive import router as archive_router
 from story_engine.api.routes.branches import router as branches_router
 from story_engine.api.routes.cast import branch_cast_router
 from story_engine.api.routes.cast import router as cast_router
+from story_engine.api.routes.character_voice import router as character_voice_router
 from story_engine.api.routes.chapters import branch_chapters_router
 from story_engine.api.routes.chapters import router as chapters_router
 from story_engine.api.routes.endings import router as endings_router
@@ -80,6 +81,7 @@ def create_app() -> FastAPI:
     app.include_router(archive_router)
     app.include_router(narration_router)
     app.include_router(voice_router)
+    app.include_router(character_voice_router)
 
     @app.get("/api/v1/health", include_in_schema=False)
     def health() -> JSONResponse:
