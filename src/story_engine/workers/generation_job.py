@@ -152,26 +152,51 @@ def run_generation_job(job_id: UUID) -> None:
         try:
             with connection.cursor() as cursor:
                 cursor.execute(
-                    "SELECT j.requested_by_user_id, s.title, e.id, e.name, s.language, "
-                    "j.branch_id "
+                    "SELECT j.requested_by_user_id, s.title, s.language, j.branch_id, s.id "
                     "FROM generation_jobs j "
                     "JOIN branches b ON b.id = j.branch_id "
                     "JOIN stories s ON s.id = b.story_id "
-                    "LEFT JOIN entities e ON e.story_id = s.id AND e.entity_type = 'character' "
-                    "WHERE j.id = %s ORDER BY e.created_at NULLS LAST LIMIT 1",
+                    "WHERE j.id = %s",
                     (job_id,),
                 )
                 row = cursor.fetchone()
             if row is None:
                 raise RuntimeError("Generation job context is unavailable")
-            requester_id, story_title, focal_id, focal_name, story_language, job_branch_id = cast(
+            requester_id, story_title, story_language, job_branch_id, story_id = cast(
                 tuple[Any, ...], row
             )
-            if focal_id is None:
-                raise RuntimeError("A story needs at least one character before generation")
             requester_uuid = UUID(str(requester_id))
             set_tenant_context(connection, requester_uuid)
             language = StoryLanguage(str(story_language))
+
+            # The *current* cast, not a fixed snapshot from story creation:
+            # reads `cast_members` (not `entities` directly), so a character
+            # removed via the workspace's Cast panel stops being picked as
+            # focal or offered to the model, and one just added is available
+            # immediately — `entities` alone has no notion of "currently in
+            # the story," it only ever grows.
+            # No character is a protagonist — every cast member is equal.
+            # `cast_members.role` is always 'CHARACTER' now (migration 0021);
+            # ordering by creation time only picks *which* character a given
+            # chapter happens to focus on, not a fixed lead role.
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT e.id, e.name FROM cast_members cm "
+                    "JOIN entities e ON e.id = cm.entity_id "
+                    "WHERE cm.story_id = %s ORDER BY cm.created_at",
+                    (story_id,),
+                )
+                cast_rows = cast(list[tuple[Any, ...]], cursor.fetchall())
+            if not cast_rows:
+                raise RuntimeError("A story needs at least one character before generation")
+            focal_id, focal_name = cast_rows[0]
+            other_names = [name for _id, name in cast_rows[1:]]
+            cast_line = (
+                f"Available cast for this story: {focal_name}"
+                + (", " + ", ".join(other_names) if other_names else "")
+                + ". Only use characters from this list — none of them is a protagonist; "
+                "write them as an ensemble."
+            )
 
             # Prior chapters on this branch, oldest first: without this, every
             # "Continue" was told nothing about what already happened and the
@@ -204,7 +229,7 @@ def run_generation_job(job_id: UUID) -> None:
             provider = OpenAIResponsesProvider(api_key=api_key)
             story_context = (
                 f"Story title: {story_title}\nFocal character: {focal_name}\n"
-                f"{continuity_instruction}"
+                f"{cast_line}\n{continuity_instruction}"
             )
             sequence = 1
             _write_event(

@@ -38,40 +38,24 @@ from story_engine.security.prompt_safety import delimit_untrusted_text
 _MIN_CHARACTERS = 1
 _MAX_CHARACTERS = 6
 _TARGET_CHARACTERS_HINT = "2 to 4"
-_PROTAGONIST_ROLE_MARKERS = (
-    "protagonist",
-    "hero",
-    "heroine",
-    "lead",
-    "main character",
-    "central character",
-    "नायक",
-    "नायिका",
-    "मुख्य पात्र",
-    "मुख्य चरित्र",
-    "ప్రధాన పాత్ర",
-    "కథానాయకుడు",
-    "కథానాయకి",
-    "హీరో",
-)
 
 _CAST_PROPOSAL_SYSTEM_PROMPT = (
     "CastProposal v1: Given a short story seed, propose between 2 and 4 starting "
-    "characters for the cast, the first of whom must be the protagonist. "
+    "characters for the cast, written as an ensemble — no character is the "
+    "protagonist or lead; every character is equally central. "
     "A character is not necessarily a human — base every character's species "
-    "and nature on what actually fits the seed. A protagonist (or any cast "
-    "member) may just as well be an animal (a fish, an elephant, a fox), a "
-    "plant or tree, an object, a spirit, or anything else the story seed "
-    "implies; never default to a human character out of habit if the seed "
-    "suggests otherwise. "
+    "and nature on what actually fits the seed. Any cast member may just as "
+    "well be an animal (a fish, an elephant, a fox), a plant or tree, an "
+    "object, a spirit, or anything else the story seed implies; never "
+    "default to a human character out of habit if the seed suggests "
+    "otherwise. "
     "Respond with ONLY a JSON array (no prose, no markdown fences). Each element "
     "must be an object with exactly these string fields: "
     '"name" (a fitting name for whatever this character is — a person\'s name, '
     'an animal\'s name, or simply what it is, e.g. "the old oak tree"), '
-    '"role" (a short descriptor including what kind of being/thing this '
-    'character is, e.g. "Protagonist · Wandering elephant matriarch" or '
-    '"Protagonist · Rogue Watchmaker"; the first character\'s role must '
-    "clearly indicate they are the protagonist), "
+    '"role" (a short descriptor of what kind of being/thing this character '
+    'is, e.g. "Wandering elephant matriarch" or "Rogue Watchmaker" — never '
+    'label anyone "protagonist," "hero," or "lead"), '
     '"voice" (their dialogue style, or how they communicate/express themselves '
     "if they don't literally speak), "
     '"traits" (comma-separated core personality traits), '
@@ -121,11 +105,11 @@ def parse_and_validate_cast_proposal(raw_output: str) -> list[CastCharacterPropo
     """Defensively parse and bound the LLM's raw text into a safe cast list.
 
     Fails closed with a clear `CastProposalError` on: invalid JSON, wrong
-    shape, too few/too many characters, a missing protagonist-flagged first
-    character, or fields exceeding bounded lengths (each field is also
-    truncated/validated by `CastCharacterProposal`'s own `Field` limits, but
-    we reject outright rather than silently truncating a bad structural
-    shape, since truncation of a wrong shape would hide the real problem).
+    shape, too few/too many characters, or fields exceeding bounded lengths
+    (each field is also truncated/validated by `CastCharacterProposal`'s own
+    `Field` limits, but we reject outright rather than silently truncating a
+    bad structural shape, since truncation of a wrong shape would hide the
+    real problem).
     """
 
     cleaned = _extract_json_array(raw_output)
@@ -157,23 +141,6 @@ def parse_and_validate_cast_proposal(raw_output: str) -> list[CastCharacterPropo
         except ValidationError as error:
             raise CastProposalError(f"Character {index} had an invalid shape: {error}") from error
 
-    # The system prompt instructs the model to put the protagonist first and
-    # to say so in that character's `role`. Real models don't always phrase
-    # this exactly the way `_PROTAGONIST_ROLE_MARKERS` expects (e.g. "Main
-    # character" in English, or any phrasing in a language we haven't added
-    # a marker for yet) — and downstream code (`cast.py`'s `lock_cast`)
-    # already treats the *first* character in the list as the protagonist
-    # positionally, regardless of what its role string says. So rather than
-    # hard-rejecting an otherwise-good proposal over word choice, we
-    # auto-label it: if no known marker is present, prefix the role with
-    # "Protagonist · " so the author sees an accurate, visible label without
-    # ever losing a valid cast to a wording mismatch.
-    first_role = characters[0].role.casefold()
-    if not any(marker in first_role for marker in _PROTAGONIST_ROLE_MARKERS):
-        characters[0] = characters[0].model_copy(
-            update={"role": f"Protagonist · {characters[0].role}"}
-        )
-
     return characters
 
 
@@ -201,7 +168,7 @@ def fallback_cast_from_seed(seed: str) -> list[CastCharacterProposal]:
     cast = [
         CastCharacterProposal(
             name="You",
-            role=f"Protagonist · {setting.title()} explorer",
+            role=f"{setting.title()} explorer",
             voice="Direct, observant, and determined",
             traits="curious, resilient, loyal",
             visual="practical expedition gear",
@@ -210,7 +177,7 @@ def fallback_cast_from_seed(seed: str) -> list[CastCharacterProposal]:
     cast.extend(
         CastCharacterProposal(
             name=name,
-            role="Starting companion",
+            role="Companion",
             voice="Warm and supportive",
             traits="resourceful, loyal, adaptable",
             visual="expedition gear suited to the journey",

@@ -76,14 +76,14 @@ python3 run_tts.py \
 
 ### API server (+ public tunnel)
 ```bash
-bash start_server.sh   # starts uvicorn on :8000 + ngrok tunnel, prints public URL
+bash start_server.sh   # starts uvicorn on :8001 + ngrok tunnel, prints public URL
 bash stop_server.sh    # stops both
 ```
 
 Or manually:
 ```bash
 source .venv/bin/activate
-uvicorn api_server:app --host 0.0.0.0 --port 8000
+uvicorn api_server:app --host 0.0.0.0 --port 8001
 ```
 
 **Endpoints:**

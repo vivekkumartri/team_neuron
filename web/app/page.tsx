@@ -1,51 +1,12 @@
 "use client";
 
-import { useState } from "react";
-
 import { AppShell } from "../components/app-shell/AppShell";
-import { EndingOptionsView } from "../components/features/endings/EndingOptionsView";
 import { OnboardingFlow } from "../components/features/onboarding/OnboardingFlow";
-import { BusinessReportsView } from "../components/features/reports/BusinessReportsView";
-import { TraceDrawer } from "../components/features/reports/TraceDrawer";
 import { StoryList } from "../components/features/stories/StoryList";
+import { VoiceAgentView } from "../components/features/voice/VoiceAgentView";
 import { WorkspaceView } from "../components/features/workspace/WorkspaceView";
-import { WorldView } from "../components/features/world/WorldView";
 import { useClientRouter } from "../lib/client-router";
 import { useSelectedBranch } from "../lib/story-context";
-
-/**
- * `/world`, `/endings`, and `/reports` still don't have a per-view story
- * picker of their own (only `/workspace` reads the shared "active branch"),
- * so they keep a plain text-box fallback for now — narrower gap than before,
- * where nothing in `app/page.tsx` had ever imported the real `StoryList`
- * picker at all.
- */
-function IdScopedView({
-  title,
-  placeholder,
-  render,
-}: {
-  title: string;
-  placeholder: string;
-  render: (id: string) => React.ReactNode;
-}) {
-  const [id, setId] = useState("");
-  return (
-    <section className="mx-auto max-w-2xl space-y-4">
-      <h1 className="text-2xl font-semibold">{title}</h1>
-      <label className="block text-sm">
-        {placeholder}
-        <input
-          value={id}
-          onChange={(event) => setId(event.target.value)}
-          className="mt-1 w-full rounded-lg border border-stone-700 bg-[#11101a] p-2 font-mono text-sm"
-          placeholder="00000000-0000-0000-0000-000000000000"
-        />
-      </label>
-      {id && render(id)}
-    </section>
-  );
-}
 
 function WorkspaceRoute() {
   const { branchId } = useSelectedBranch();
@@ -69,35 +30,8 @@ function RouteOutlet() {
   if (pathname === "/workspace") {
     return <WorkspaceRoute />;
   }
-  if (pathname === "/world") {
-    return (
-      <IdScopedView title="World" placeholder="Branch ID" render={(id) => <WorldView branchId={id} />} />
-    );
-  }
-  if (pathname === "/endings") {
-    return (
-      <IdScopedView
-        title="Endings"
-        placeholder="Branch ID"
-        render={(id) => <EndingOptionsView branchId={id} />}
-      />
-    );
-  }
-  if (pathname === "/reports") {
-    return (
-      <section className="mx-auto max-w-2xl space-y-8">
-        <IdScopedView
-          title="Business reports"
-          placeholder="Branch ID"
-          render={(id) => <BusinessReportsView branchId={id} />}
-        />
-        <IdScopedView
-          title="Agent trace"
-          placeholder="Agent run ID"
-          render={(id) => <TraceDrawer runId={id} />}
-        />
-      </section>
-    );
+  if (pathname === "/voice") {
+    return <VoiceAgentView />;
   }
   return <OnboardingFlow onStoryReady={() => navigate("/workspace")} />;
 }

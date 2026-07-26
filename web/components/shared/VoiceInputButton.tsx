@@ -5,10 +5,19 @@ import { useEffect, useRef } from "react";
 import { useVoiceTranscription } from "../../lib/voice-stream";
 
 /**
- * Drop-in mic control for any free-text field. Shows a recording indicator,
- * live partial transcript while speaking, and calls `onTranscript` once with
- * the final, content-policy-checked text (see `api/routes/voice.py` —
- * a `rejected` transcript never reaches `onTranscript`, only `onRejected`).
+ * Icon-only mic control meant to sit *inside* the field it feeds, anchored
+ * to the bottom-right corner the way a chat app (WhatsApp, iMessage, etc.)
+ * places its mic inside the message box rather than as a separate button
+ * off to the side — the previous version rendered as its own labeled button
+ * below the textarea, disconnected from the field it was actually for.
+ * Wrap the target `<textarea>`/`<input>` in a `relative` container and drop
+ * this inside it (see `SeedForm.tsx` for the pattern); it positions itself
+ * with `absolute`, so it needs nothing from the caller but that wrapper.
+ *
+ * Shows a recording indicator, live partial transcript while speaking, and
+ * calls `onTranscript` once with the final, content-policy-checked text (see
+ * `api/routes/voice.py` — a `rejected` transcript never reaches
+ * `onTranscript`, only `onRejected`).
  *
  * This button never submits anything on its own; the caller decides what to
  * do with the returned text (usually append/replace into its own textarea
@@ -63,10 +72,12 @@ export function VoiceInputButton({
   const recording = state === "recording" || state === "connecting" || state === "stopping";
 
   return (
-    <div className="inline-flex flex-col gap-1">
+    <>
       <button
         type="button"
         aria-pressed={recording}
+        aria-label={recording ? "Stop recording" : label}
+        title={recording ? "Stop recording" : label}
         onClick={() => {
           if (recording) {
             stop();
@@ -74,25 +85,24 @@ export function VoiceInputButton({
             void start();
           }
         }}
-        className={`inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium ${
+        className={`absolute right-2 top-1/2 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full border text-sm shadow ${
           recording
-            ? "border-rose-400 bg-rose-950/30 text-rose-200"
-            : "border-stone-700 bg-[#11101a] text-stone-200"
+            ? "animate-pulse border-rose-400 bg-rose-950/60 text-rose-200"
+            : "border-stone-600 bg-[#191724] text-stone-300 hover:border-teal-300 hover:text-teal-200"
         }`}
       >
         <span aria-hidden>{recording ? "●" : "🎙"}</span>
-        {recording ? "Stop" : label}
       </button>
-      {recording && partialText && (
-        <p role="status" className="max-w-xs text-xs text-stone-400">
-          {partialText}
+      {(recording && partialText) || errorMessage ? (
+        <p
+          role={errorMessage ? "alert" : "status"}
+          className={`absolute right-0 top-full mt-1 max-w-[80%] rounded-md bg-[#11101a] px-2 py-1 text-xs shadow ${
+            errorMessage ? "text-rose-300" : "text-stone-400"
+          }`}
+        >
+          {errorMessage ?? partialText}
         </p>
-      )}
-      {errorMessage && (
-        <p role="alert" className="max-w-xs text-xs text-rose-300">
-          {errorMessage}
-        </p>
-      )}
-    </div>
+      ) : null}
+    </>
   );
 }

@@ -71,7 +71,6 @@ def test_story_input_accepts_a_full_edited_cast() -> None:
                 "traits": "Cautious, loyal",
                 "visual": "Grease-stained hands",
                 "background_story": "A careful watchmaker raised in the lower city.",
-                "is_protagonist": True,
             },
             {
                 "name": "Mira Voss",
@@ -79,12 +78,10 @@ def test_story_input_accepts_a_full_edited_cast() -> None:
                 "voice": "Clipped",
                 "traits": "Rule-bound",
                 "visual": "Brass mask",
-                "is_protagonist": False,
             },
         ],
     )
     assert len(payload.cast) == 2
-    assert payload.cast[0].is_protagonist is True
     assert payload.cast[0].background_story.startswith("A careful")
     # No `hidden` field exists on the model at all (task.md 0.4): passing one
     # is rejected outright by `extra="forbid"`.
@@ -115,7 +112,7 @@ def test_story_input_rejects_a_hidden_field_on_a_cast_member() -> None:
 
 def test_story_input_rejects_more_than_six_cast_members() -> None:
     seven_members = [
-        {"name": f"Character {i}", "role": "Supporting", "is_protagonist": i == 0} for i in range(7)
+        {"name": f"Character {i}", "role": "Supporting"} for i in range(7)
     ]
     with pytest.raises(ValidationError):
         StoryInput(title="A crowded cast", language="en", cast=seven_members)

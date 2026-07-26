@@ -42,17 +42,19 @@ export function RevisionRequestForm({ chapterId }: { chapterId: string }) {
     <div className="space-y-3">
       <label className="block text-sm">
         What should change?
-        <textarea
-          value={patch}
-          onChange={(event) => setPatch(event.target.value)}
-          rows={4}
-          className="mt-1 w-full rounded-lg border border-stone-700 bg-[#11101a] p-3"
-        />
+        <div className="relative mt-1">
+          <textarea
+            value={patch}
+            onChange={(event) => setPatch(event.target.value)}
+            rows={4}
+            className="w-full rounded-lg border border-stone-700 bg-[#11101a] p-3 pr-12"
+          />
+          <VoiceInputButton
+            label="Speak your patch"
+            onTranscript={(text) => setPatch((current) => (current.trim() ? `${current.trim()} ${text}` : text))}
+          />
+        </div>
       </label>
-      <VoiceInputButton
-        label="Speak your patch"
-        onTranscript={(text) => setPatch((current) => (current.trim() ? `${current.trim()} ${text}` : text))}
-      />
       {status === "error" && (
         <p role="alert" className="text-sm text-rose-300">
           Couldn't submit the revision request. Nothing was changed.

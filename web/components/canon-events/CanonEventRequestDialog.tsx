@@ -89,19 +89,21 @@ export function CanonEventRequestDialog({
       )}
       <label className="block text-sm">
         Why? (optional)
-        <textarea
-          value={rationale}
-          onChange={(event) => setRationale(event.target.value)}
-          rows={2}
-          className="mt-1 w-full rounded-lg border border-stone-700 bg-[#11101a] p-2"
-        />
+        <div className="relative mt-1">
+          <textarea
+            value={rationale}
+            onChange={(event) => setRationale(event.target.value)}
+            rows={2}
+            className="w-full rounded-lg border border-stone-700 bg-[#11101a] p-2 pr-12"
+          />
+          <VoiceInputButton
+            label="Speak rationale"
+            onTranscript={(text) =>
+              setRationale((current) => (current.trim() ? `${current.trim()} ${text}` : text))
+            }
+          />
+        </div>
       </label>
-      <VoiceInputButton
-        label="Speak rationale"
-        onTranscript={(text) =>
-          setRationale((current) => (current.trim() ? `${current.trim()} ${text}` : text))
-        }
-      />
       <label className="flex items-center gap-2 text-sm">
         <input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />
         I understand this only submits a request for review.

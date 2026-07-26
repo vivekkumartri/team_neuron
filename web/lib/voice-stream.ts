@@ -15,13 +15,17 @@ import { apiWsBase } from "./api-client";
  * here — the browser's WebSocket handshake carries the same cookies/headers
  * as any other same-origin request through the Databricks Apps proxy.
  *
- * "Streaming" here means: `MediaRecorder` is asked for a new chunk every
- * `chunkIntervalMs` (default 2500ms) and each chunk is sent as a binary
- * WebSocket frame the moment it's available — not one upload after
- * recording stops. The server transcribes each chunk with a synchronous
- * Whisper call and pushes back a `partial` transcript per chunk; sending the
- * `"stop"` control message (via `stop()`) asks the server to fold every
- * chunk's text into one policy-checked `final` transcript.
+ * Records the whole utterance and transcribes it once, when recording stops
+ * — not a true incremental stream. An earlier version called
+ * `recorder.start(chunkIntervalMs)` and sent each `ondataavailable` chunk to
+ * the server as its own audio file; for `audio/webm`, only the *first* chunk
+ * from a timesliced recording contains the container header, so every chunk
+ * after that was an undecodable fragment. The server transcribed the first
+ * chunk fine, errored on every chunk after, and `final` ended up built from
+ * whatever partial text happened to survive — which is why transcription
+ * silently stopped working and nothing landed in the target field. Calling
+ * `recorder.start()` with no timeslice makes `ondataavailable` fire exactly
+ * once, on `stop()`, with one complete, valid recording.
  */
 
 export type VoiceStreamState = "idle" | "connecting" | "recording" | "stopping" | "error";
@@ -101,11 +105,17 @@ export function useVoiceTranscription(
         const recorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
         recorderRef.current = recorder;
         recorder.ondataavailable = (event) => {
-          if (event.data.size > 0 && socket.readyState === WebSocket.OPEN) {
+          if (event.data.size === 0) return;
+          // Fires once, on stop() (no timeslice passed to start()), with one
+          // complete valid recording — safe to send and decode as a whole file.
+          if (socket.readyState === WebSocket.OPEN) {
             socket.send(event.data);
           }
+          if (socket.readyState === WebSocket.OPEN) {
+            socket.send(JSON.stringify({ action: "stop" }));
+          }
         };
-        recorder.start(chunkIntervalMs);
+        recorder.start();
         setState("recording");
       };
 
@@ -151,11 +161,11 @@ export function useVoiceTranscription(
 
   const stop = useCallback(() => {
     setState("stopping");
+    // `ondataavailable` (fired by this `stop()` call, since recording started
+    // with no timeslice) sends the audio and the "stop" control message
+    // together, in that order — sending "stop" here too would race it and
+    // could reach the server before the audio does.
     recorderRef.current?.stop();
-    const socket = socketRef.current;
-    if (socket?.readyState === WebSocket.OPEN) {
-      socket.send(JSON.stringify({ action: "stop" }));
-    }
   }, []);
 
   return { state, partialText, finalText, rejection, errorMessage, start, stop };

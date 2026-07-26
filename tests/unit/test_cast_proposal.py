@@ -86,7 +86,7 @@ def test_missing_protagonist_marker_is_auto_labeled_not_rejected() -> None:
         '{"name": "Dial", "role": "Sentient Artifact", "voice": "", "traits": "", "visual": ""}]'
     )
     characters = parse_and_validate_cast_proposal(no_marker)
-    assert characters[0].role == "Protagonist · Guild Enforcer"
+    assert characters[0].role == "Guild Enforcer"
     assert characters[1].role == "Sentient Artifact"
 
 
@@ -132,4 +132,4 @@ def test_seed_fallback_preserves_named_companions_and_setting() -> None:
     characters = fallback_cast_from_seed("i am on moon with my 2 friends rahul and teja")
 
     assert [character.name for character in characters] == ["You", "Rahul", "Teja"]
-    assert characters[0].role == "Protagonist · Lunar explorer"
+    assert characters[0].role == "Lunar explorer"

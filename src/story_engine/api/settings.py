@@ -52,6 +52,7 @@ class RuntimeSettings(BaseModel):
     openai_transcription_model: str = Field(default="whisper-1", min_length=1, max_length=100)
     openai_tts_model: str = Field(default="tts-1", min_length=1, max_length=100)
     narrator_voice: str = Field(default="alloy", min_length=1, max_length=64)
+    indicf5_base_url: str | None = None
 
     @property
     def database_resource_bound(self) -> bool:
@@ -76,6 +77,10 @@ class RuntimeSettings(BaseModel):
 
         return bool(self.openai_api_key)
 
+    @property
+    def indicf5_configured(self) -> bool:
+        return bool(self.indicf5_base_url)
+
 
 def load_settings() -> RuntimeSettings:
     """Read injected Lakebase connection metadata without accepting a raw URL."""
@@ -98,4 +103,5 @@ def load_settings() -> RuntimeSettings:
         openai_transcription_model=os.getenv("OPENAI_TRANSCRIPTION_MODEL", "whisper-1"),
         openai_tts_model=os.getenv("OPENAI_TTS_MODEL", "tts-1"),
         narrator_voice=os.getenv("NARRATOR_VOICE", "alloy"),
+        indicf5_base_url=os.getenv("INDICF5_BASE_URL"),
     )

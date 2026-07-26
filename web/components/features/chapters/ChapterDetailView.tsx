@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { apiFetch } from "../../../lib/api-client";
 import { RevisionRequestForm } from "../../revisions/RevisionRequestForm";
 import { ChapterNarrationPlayer } from "../../shared/ChapterNarrationPlayer";
+import { ChapterNarrationTab } from "../../shared/ChapterNarrationTab";
 
 interface DialogueLine {
   line_index: number;
@@ -42,6 +43,7 @@ interface ChapterResponse {
 export function ChapterDetailView({ chapterId }: { chapterId: string }) {
   const [chapter, setChapter] = useState<ChapterResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [tab, setTab] = useState<"story" | "narration">("story");
 
   useEffect(() => {
     let cancelled = false;
@@ -80,26 +82,48 @@ export function ChapterDetailView({ chapterId }: { chapterId: string }) {
           Chapter {chapter.chapter_index} · {chapter.status}
         </p>
         {chapter.status === "PUBLISHED" && (
-          <div className="mt-3">
+          <div className="mt-3 flex items-center gap-3">
             <ChapterNarrationPlayer chapterId={chapterId} />
+            <div className="flex overflow-hidden rounded-lg border border-stone-700 text-xs">
+              <button
+                type="button"
+                onClick={() => setTab("story")}
+                aria-current={tab === "story" ? "page" : undefined}
+                className={`px-3 py-2 ${tab === "story" ? "bg-teal-950/40 text-teal-200" : "text-stone-300"}`}
+              >
+                Story
+              </button>
+              <button
+                type="button"
+                onClick={() => setTab("narration")}
+                aria-current={tab === "narration" ? "page" : undefined}
+                className={`px-3 py-2 ${tab === "narration" ? "bg-teal-950/40 text-teal-200" : "text-stone-300"}`}
+              >
+                Narration
+              </button>
+            </div>
           </div>
         )}
       </header>
 
-      <div className="space-y-6">
-        {chapter.scenes.map((scene) => (
-          <section key={scene.scene_index} className="rounded-xl border border-stone-700 p-5">
-            <p className="text-stone-200">{scene.summary}</p>
-            {scene.dialogue.length > 0 && (
-              <ul className="mt-4 space-y-2 text-sm text-stone-300">
-                {scene.dialogue.map((line) => (
-                  <li key={line.line_index}>{line.line_text}</li>
-                ))}
-              </ul>
-            )}
-          </section>
-        ))}
-      </div>
+      {tab === "narration" && chapter.status === "PUBLISHED" ? (
+        <ChapterNarrationTab chapterId={chapterId} />
+      ) : (
+        <div className="space-y-6">
+          {chapter.scenes.map((scene) => (
+            <section key={scene.scene_index} className="rounded-xl border border-stone-700 p-5">
+              <p className="text-stone-200">{scene.summary}</p>
+              {scene.dialogue.length > 0 && (
+                <ul className="mt-4 space-y-2 text-sm text-stone-300">
+                  {scene.dialogue.map((line) => (
+                    <li key={line.line_index}>{line.line_text}</li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          ))}
+        </div>
+      )}
 
       {chapter.choices.length > 0 && (
         <div className="grid gap-3 sm:grid-cols-3">

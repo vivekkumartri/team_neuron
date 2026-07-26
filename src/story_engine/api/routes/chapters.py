@@ -28,6 +28,37 @@ class ChapterSummary(BaseModel):
     published_at: str | None
 
 
+class BranchSummary(BaseModel):
+    id: UUID
+    name: str
+    parent_branch_id: UUID | None
+
+
+@branch_chapters_router.get("/{branch_id}", response_model=BranchSummary)
+def get_branch(branch_id: UUID, user: CurrentUser) -> BranchSummary:
+    """A single branch's own name — `GET /arcs/:id/branches` only lists a
+
+    whole arc's branches and needs an arc id the workspace screen doesn't
+    have; this is the direct "what branch am I looking at" lookup it needs to
+    show e.g. a rewind branch's "(Branch B)" label (see `progression.py`).
+    """
+
+    with tenant_connection(user) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT id, name, parent_branch_id FROM branches WHERE id = %s", (branch_id,)
+            )
+            row = cursor.fetchone()
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Branch not found")
+    values = cast(tuple[Any, ...], row)
+    return BranchSummary(
+        id=UUID(str(values[0])),
+        name=str(values[1]),
+        parent_branch_id=UUID(str(values[2])) if values[2] is not None else None,
+    )
+
+
 @branch_chapters_router.get("/{branch_id}/chapters", response_model=list[ChapterSummary])
 def list_branch_chapters(branch_id: UUID, user: CurrentUser) -> list[ChapterSummary]:
     """Published chapters for a branch, oldest first — lets the client find

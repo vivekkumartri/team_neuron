@@ -31,24 +31,26 @@ export function SeedForm({ onContinue }: { onContinue: (seed: string) => void })
       <label htmlFor="seed-input" className="block text-sm font-medium text-stone-200">
         What's the story about?
       </label>
-      <textarea
-        id="seed-input"
-        value={seed}
-        onChange={(event) => {
-          setSeed(event.target.value);
-          setAcknowledgedShortSeed(false);
-        }}
-        rows={4}
-        className="w-full rounded-lg border border-stone-700 bg-[#11101a] p-3 text-stone-100"
-        placeholder="A lighthouse keeper who can hear the ships that never made it home."
-      />
-      <VoiceInputButton
-        label="Speak your seed"
-        onTranscript={(text) => {
-          setSeed((current) => (current.trim() ? `${current.trim()} ${text}` : text));
-          setAcknowledgedShortSeed(false);
-        }}
-      />
+      <div className="relative">
+        <textarea
+          id="seed-input"
+          value={seed}
+          onChange={(event) => {
+            setSeed(event.target.value);
+            setAcknowledgedShortSeed(false);
+          }}
+          rows={4}
+          className="w-full rounded-lg border border-stone-700 bg-[#11101a] p-3 pr-12 text-stone-100"
+          placeholder="A lighthouse keeper who can hear the ships that never made it home."
+        />
+        <VoiceInputButton
+          label="Speak your seed"
+          onTranscript={(text) => {
+            setSeed((current) => (current.trim() ? `${current.trim()} ${text}` : text));
+            setAcknowledgedShortSeed(false);
+          }}
+        />
+      </div>
       {needsClarification && (
         <div role="status" className="rounded-lg border border-amber-300/60 bg-amber-950/20 p-3 text-sm text-amber-100">
           <p>
