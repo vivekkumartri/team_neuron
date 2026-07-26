@@ -26,6 +26,27 @@ resources:
           default: ""
       max_concurrent_runs: 1
 
+    storyboard_job:
+      name: story-engine-storyboard-${bundle.target}
+      environments:
+        - environment_key: serverless
+          spec:
+            environment_version: "4"
+            dependencies:
+              - ../dist/*.whl
+      tasks:
+        - task_key: run_storyboard
+          environment_key: serverless
+          python_wheel_task:
+            package_name: story_engine
+            entry_point: run_storyboard_job
+            named_parameters:
+              job-id: "{{job.parameters.job_id}}"
+      parameters:
+        - name: job_id
+          default: ""
+      max_concurrent_runs: 4
+
     report_job:
       name: story-engine-report-${bundle.target}
       environments:
