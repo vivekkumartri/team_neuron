@@ -167,7 +167,9 @@ def list_branch_cast_members(branch_id: UUID, user: CurrentUser) -> list[CastMem
             )
             story_row = cursor.fetchone()
             if story_row is None:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Branch not found")
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND, detail="Branch not found"
+                )
             story_id, cast_locked_at = cast(tuple[Any, ...], story_row)
 
         if cast_locked_at is None:
@@ -203,14 +205,18 @@ def add_cast_member(
 
     name = payload.name.strip()
     if not name:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Name is required")
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Name is required"
+        )
 
     with tenant_connection(user) as connection:
         with connection.cursor() as cursor:
             cursor.execute("SELECT story_id FROM branches WHERE id = %s", (branch_id,))
             branch_row = cursor.fetchone()
             if branch_row is None:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Branch not found")
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND, detail="Branch not found"
+                )
             story_id = cast(tuple[Any, ...], branch_row)[0]
 
             try:
@@ -235,7 +241,9 @@ def add_cast_member(
     return CastMember(entity_id=UUID(str(entity_id)), name=name, role="CHARACTER")
 
 
-@branch_cast_router.delete("/{branch_id}/cast-members/{entity_id}", status_code=status.HTTP_204_NO_CONTENT)
+@branch_cast_router.delete(
+    "/{branch_id}/cast-members/{entity_id}", status_code=status.HTTP_204_NO_CONTENT
+)
 def remove_cast_member(branch_id: UUID, entity_id: UUID, user: CurrentUser) -> None:
     """Remove a character from the story's active cast.
 
@@ -259,7 +267,9 @@ def remove_cast_member(branch_id: UUID, entity_id: UUID, user: CurrentUser) -> N
             )
             row = cursor.fetchone()
             if row is None:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cast member not found")
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND, detail="Cast member not found"
+                )
             story_id = cast(tuple[Any, ...], row)[0]
 
             cursor.execute("SELECT count(*) FROM cast_members WHERE story_id = %s", (story_id,))
@@ -267,7 +277,10 @@ def remove_cast_member(branch_id: UUID, entity_id: UUID, user: CurrentUser) -> N
             if member_count <= 1:
                 raise HTTPException(
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail="A story needs at least one character — add another before removing this one",
+                    detail=(
+                        "A story needs at least one character — add another before removing "
+                        "this one"
+                    ),
                 )
 
             cursor.execute(

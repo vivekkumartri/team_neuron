@@ -45,6 +45,8 @@ class RuntimeSettings(BaseModel):
     local_dev_mode: bool = False
     openai_api_key: str | None = None
     openai_model: str = Field(default="gpt-5.6-sol", min_length=1, max_length=100)
+    storyboard_image_model: str = Field(default="gpt-image-2", min_length=1, max_length=100)
+    storyboard_image_quality: str = Field(default="low", pattern="^(low|medium|high)$")
     openai_secret_scope: str = Field(default="story-engine-openai", min_length=1)
     openai_secret_key: str = Field(default="openai-api-key", min_length=1)
     openai_transcription_model: str = Field(default="whisper-1", min_length=1, max_length=100)
@@ -102,6 +104,8 @@ def load_settings() -> RuntimeSettings:
         in ("1", "true", "yes"),
         openai_api_key=os.getenv("OPENAI_API_KEY"),
         openai_model=os.getenv("OPENAI_MODEL", "gpt-5.6-sol"),
+        storyboard_image_model=os.getenv("STORYBOARD_IMAGE_MODEL", "gpt-image-2"),
+        storyboard_image_quality=os.getenv("STORYBOARD_IMAGE_QUALITY", "low"),
         openai_secret_scope=os.getenv("OPENAI_SECRET_SCOPE", "story-engine-openai"),
         openai_secret_key=os.getenv("OPENAI_SECRET_KEY", "openai-api-key"),
         openai_transcription_model=os.getenv("OPENAI_TRANSCRIPTION_MODEL", "whisper-1"),

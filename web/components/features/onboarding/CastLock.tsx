@@ -37,6 +37,7 @@ export function CastLock({
         method: "POST",
         body: {
           title: seed.slice(0, 200),
+          scenario: seed,
           personalization_enabled: true,
           language,
           cast,

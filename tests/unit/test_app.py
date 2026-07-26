@@ -7,6 +7,9 @@ from story_engine.app import create_app
 
 
 def test_health_endpoint_does_not_expose_connection_values(monkeypatch: Any) -> None:
+    # The repository supports a gitignored `.env` for local OpenAI calls. Keep
+    # this health-shape assertion independent of whether a developer has one.
+    monkeypatch.setenv("OPENAI_API_KEY", "")  # type: ignore[attr-defined]
     monkeypatch.setenv("PGHOST", "internal-db-host")  # type: ignore[attr-defined]
     monkeypatch.setenv("PGDATABASE", "story-engine")  # type: ignore[attr-defined]
     monkeypatch.setenv("PGUSER", "runtime-identity")  # type: ignore[attr-defined]

@@ -18,6 +18,8 @@ resources:
             value: gpt-5.6-sol
           - name: STORY_ENGINE_GENERATION_JOB_ID
             value_from: generation_job
+          - name: STORY_ENGINE_STORYBOARD_JOB_ID
+            value_from: storyboard_job
       # Lakebase Autoscaling resource. Databricks creates a scoped App service
       # principal role and injects PG* connection metadata at runtime; neither
       # a database password nor a connection URL belongs in source control.
@@ -35,4 +37,8 @@ resources:
         - name: generation_job
           job:
             id: ${resources.jobs.generation_job.id}
+            permission: CAN_MANAGE_RUN
+        - name: storyboard_job
+          job:
+            id: ${resources.jobs.storyboard_job.id}
             permission: CAN_MANAGE_RUN

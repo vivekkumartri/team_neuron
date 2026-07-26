@@ -30,9 +30,14 @@ class DatabricksJobLauncher:
     """Launch a Jobs resource with its safe, single UUID parameter only."""
 
     def launch(self, *, job_key: str, job_id: UUID) -> None:
-        if job_key != "generation_job":
+        if job_key not in {"generation_job", "storyboard_job"}:
             raise JobLaunchError(f"Unsupported app-launched job: {job_key}")
-        configured_id = os.getenv("STORY_ENGINE_GENERATION_JOB_ID")
+        env_name = (
+            "STORY_ENGINE_GENERATION_JOB_ID"
+            if job_key == "generation_job"
+            else "STORY_ENGINE_STORYBOARD_JOB_ID"
+        )
+        configured_id = os.getenv(env_name)
         if not configured_id or not configured_id.isdecimal():
             raise JobLaunchError("Generation job resource is not configured for this app")
         try:
@@ -57,17 +62,25 @@ class LocalJobLauncher:
 
     def launch(self, *, job_key: str, job_id: UUID) -> None:
         if job_key != "generation_job":
-            raise JobLaunchError(f"Unsupported local-launched job: {job_key}")
+            if job_key != "storyboard_job":
+                raise JobLaunchError(f"Unsupported local-launched job: {job_key}")
 
         def _run() -> None:
             # Local import: avoids a hard import-time dependency from this
             # lightweight launcher module onto the full generation worker
             # (OpenAI client, prompt templates, etc.) for callers that only
             # ever construct `DatabricksJobLauncher`.
-            from story_engine.workers.generation_job import run_generation_job
+            if job_key == "generation_job":
+                from story_engine.workers.generation_job import run_generation_job
+
+                runner = run_generation_job
+            else:
+                from story_engine.workers.storyboard_job import run_storyboard_job
+
+                runner = run_storyboard_job
 
             try:
-                run_generation_job(job_id)
+                runner(job_id)
             except Exception:
                 logger.exception("Local generation job %s failed", job_id)
 

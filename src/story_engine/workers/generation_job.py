@@ -222,7 +222,9 @@ def run_generation_job(job_id: UUID) -> None:
                     f"left off — do not restart or repeat it. Advance the plot.\n{prior_text}"
                 )
             else:
-                continuity_instruction = "This is chapter 1. Create an original, concise opening chapter."
+                continuity_instruction = (
+                    "This is chapter 1. Create an original, concise opening chapter."
+                )
 
             provider = OpenAIResponsesProvider(api_key=api_key)
             story_context = (
@@ -360,7 +362,8 @@ def run_generation_job(job_id: UUID) -> None:
                 agent="evaluator",
                 system_prompt=EVALUATOR,
                 user_data=(
-                    f"{story_context}\nWorld constraints:\n{_brief(world)}\nCandidate:\n{screenplay}"
+                    f"{story_context}\nWorld constraints:\n{_brief(world)}"
+                    f"\nCandidate:\n{screenplay}"
                 ),
                 model=settings.openai_model,
             )

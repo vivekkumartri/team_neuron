@@ -10,6 +10,7 @@ import { BranchControls, type ProgressionMode } from "./BranchControls";
 import { type QuotaBannerState } from "./QuotaBanner";
 import { ChapterNarrationTab } from "../../shared/ChapterNarrationTab";
 import { VoiceInputButton } from "../../shared/VoiceInputButton";
+import { StoryboardView } from "./StoryboardView";
 
 interface ProgressionResponse {
   job_id: string;
@@ -509,6 +510,7 @@ export function WorkspaceView({ branchId }: { branchId: string }) {
                     )}
                   </div>
                 ))}
+                <StoryboardView chapterId={latestChapter.id} />
               </div>
             )}
           </div>

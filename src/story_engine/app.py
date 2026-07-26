@@ -27,6 +27,7 @@ from story_engine.api.routes.progression import me_quota_router
 from story_engine.api.routes.progression import router as progression_router
 from story_engine.api.routes.revisions import router as revisions_router
 from story_engine.api.routes.stories import router as stories_router
+from story_engine.api.routes.storyboards import router as storyboards_router
 from story_engine.api.routes.traces import router as traces_router
 from story_engine.api.routes.voice import router as voice_router
 from story_engine.api.routes.world import router as world_router
@@ -65,6 +66,7 @@ def create_app() -> FastAPI:
         )
 
     app.include_router(stories_router)
+    app.include_router(storyboards_router)
     app.include_router(branches_router)
     app.include_router(chapters_router)
     app.include_router(branch_chapters_router)

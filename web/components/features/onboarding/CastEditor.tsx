@@ -12,6 +12,8 @@ export interface CastCharacter {
   voice: string;
   traits: string;
   visual: string;
+  background_story: string;
+  photo_data_url?: string;
 }
 
 interface CastProposalResponse {
@@ -25,6 +27,7 @@ const blankCharacter = (): CastCharacter => ({
   voice: "",
   traits: "",
   visual: "",
+  background_story: "",
 });
 
 /**
@@ -49,6 +52,7 @@ export function CastEditor({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [usingFallback, setUsingFallback] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
 
   const generate = useCallback(async () => {
     setLoading(true);
@@ -58,7 +62,12 @@ export function CastEditor({
         method: "POST",
         body: { seed, language },
       });
-      setCast(proposal.characters);
+      setCast(
+        proposal.characters.map((character) => ({
+          ...character,
+          background_story: character.background_story ?? "",
+        })),
+      );
       setUsingFallback(proposal.source === "seed_fallback");
     } catch {
       setError("We couldn't generate a cast just now. You can try again or build it yourself.");
@@ -114,9 +123,15 @@ export function CastEditor({
             <legend className="px-1 text-xs font-medium uppercase tracking-wide text-teal-300">
               Character
             </legend>
-            {(["name", "role", "voice", "traits", "visual"] as const).map((field) => (
+            {(["name", "role", "voice", "traits", "visual", "background_story"] as const).map((field) => (
               <label key={field} className="mt-3 block text-xs capitalize text-stone-400">
-                {field === "voice" ? "Voice / dialogue style" : field === "visual" ? "Visual attributes" : field}
+                {field === "voice"
+                  ? "Voice / dialogue style"
+                  : field === "visual"
+                    ? "Visual attributes"
+                    : field === "background_story"
+                      ? "Background story"
+                      : field}
                 <input
                   value={character[field]}
                   onChange={(event) => update(index, field, event.target.value)}
@@ -124,6 +139,30 @@ export function CastEditor({
                 />
               </label>
             ))}
+            <label className="mt-3 block text-xs text-stone-400">
+              Optional character photo (used as the consistency reference)
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (!file) return;
+                  if (file.size > 8 * 1024 * 1024) {
+                    setPhotoError("Choose an image smaller than 8 MB.");
+                    return;
+                  }
+                  setPhotoError(null);
+                  const reader = new FileReader();
+                  reader.onload = () => {
+                    if (typeof reader.result === "string") {
+                      update(index, "photo_data_url", reader.result);
+                    }
+                  };
+                  reader.readAsDataURL(file);
+                }}
+                className="mt-1 block w-full text-sm text-stone-300 file:mr-3 file:rounded-md file:border-0 file:bg-stone-700 file:px-3 file:py-2 file:text-stone-100"
+              />
+            </label>
             <CharacterVoiceUploadField characterName={character.name} />
             {cast.length > 1 && (
               <button
@@ -137,6 +176,8 @@ export function CastEditor({
           </fieldset>
         ))}
       </div>
+
+      {photoError && <p role="alert" className="text-sm text-rose-300">{photoError}</p>}
 
       <button
         type="button"

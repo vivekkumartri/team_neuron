@@ -79,6 +79,30 @@ instead. The backend's CORS middleware (enabled automatically whenever
 origin, and only when that env var is set — so this never opens anything up
 in the deployed App.
 
+## Generate a chapter storyboard locally
+
+The storyboard flow uses the same `OPENAI_API_KEY` loaded from the gitignored
+repository `.env`. It stores optional uploaded character photos and generated
+character reference images as tenant-scoped assets. A character without a
+photo gets one canonical reference the first time a storyboard is generated;
+later chapters reuse that reference asset.
+
+After migrations are applied, seed two published chapters:
+
+```
+python3 scripts/seed_storyboard_demo.py
+```
+
+The command prints `branch_id`, `chapter_1_id`, and `chapter_2_id`. Start the backend with
+`STORY_ENGINE_LOCAL_DEV=1`, open the workspace, and choose Chapter 1's
+**Create comic storyboard** action. The worker makes one planning call, one
+reference image for the character without a photo, and one panel image per
+scene. Repeating the action is idempotent. Chapter 2 reuses both Chapter 1
+character reference assets.
+
+For a cheap provider smoke test, keep the default image quality at `low` or
+set `STORYBOARD_IMAGE_QUALITY=low`. Never print or commit `OPENAI_API_KEY`.
+
 ## Known local-only gaps
 
 - **Chapter narration/TTS and voice transcription** call OpenAI directly —

@@ -21,6 +21,7 @@ from story_engine.services.cast_proposal import (
     fallback_cast_from_seed,
     propose_cast,
 )
+from story_engine.storyboard.assets import ImageDataError, decode_image_data_url
 
 router = APIRouter(prefix="/api/v1/stories", tags=["stories"])
 CurrentUser = Annotated[AuthenticatedUser, Depends(authenticate_request)]
@@ -43,6 +44,8 @@ class CastMemberInput(BaseModel):
     voice: str = Field(default="", max_length=200)
     traits: str = Field(default="", max_length=200)
     visual: str = Field(default="", max_length=200)
+    background_story: str = Field(default="", max_length=2_000)
+    photo_data_url: str | None = Field(default=None, max_length=12_000_000)
 
 
 class CastProposalInput(BaseModel):
@@ -63,6 +66,7 @@ class StoryInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     title: str = Field(min_length=1, max_length=200)
+    scenario: str = Field(default="", max_length=4_000)
     personalization_enabled: bool = False
     agent_trace_enabled: bool = False
     # Per-story preference, chosen once at creation (task.md Phase 6
@@ -163,13 +167,14 @@ def create_story(payload: StoryInput, user: CurrentUser) -> StoryResponse:
     with tenant_connection(user) as connection:
         with connection.cursor() as cursor:
             cursor.execute(
-                "INSERT INTO stories (user_id, title, personalization_enabled, "
+                "INSERT INTO stories (user_id, title, scenario, personalization_enabled, "
                 "agent_trace_enabled, language) "
-                "VALUES (%s, %s, %s, %s, %s) "
+                "VALUES (%s, %s, %s, %s, %s, %s) "
                 "RETURNING id, title, personalization_enabled, agent_trace_enabled, language",
                 (
                     user.id,
                     payload.title,
+                    payload.scenario or payload.title,
                     payload.personalization_enabled,
                     payload.agent_trace_enabled,
                     payload.language.value,
@@ -205,7 +210,10 @@ def create_story(payload: StoryInput, user: CurrentUser) -> StoryResponse:
                     # author as a generic 500 with no explanation.
                     raise HTTPException(
                         status_code=status.HTTP_409_CONFLICT,
-                        detail="Two characters in your cast have the same name. Give each a unique name and try again.",
+                        detail=(
+                            "Two characters in your cast have the same name. Give each a unique "
+                            "name and try again."
+                        ),
                     )
             focal_id: UUID | None = None
             if cast_input:
@@ -216,11 +224,34 @@ def create_story(payload: StoryInput, user: CurrentUser) -> StoryResponse:
                 # to start; that's an ordering convenience, not a role.
                 for index, member in enumerate(cast_input):
                     cursor.execute(
-                        "INSERT INTO entities (story_id, name, entity_type, founding_branch_id) "
-                        "VALUES (%s, %s, 'character', %s) RETURNING id",
-                        (story_id, member.name, branch_id),
+                        "INSERT INTO entities (story_id, name, entity_type, founding_branch_id, "
+                        "background_story, visual_description) "
+                        "VALUES (%s, %s, 'character', %s, %s, %s) "
+                        "RETURNING id",
+                        (story_id, member.name, branch_id, member.background_story, member.visual),
                     )
                     entity_id = UUID(str(cast(tuple[object, ...], cursor.fetchone())[0]))
+                    if member.photo_data_url:
+                        try:
+                            image = decode_image_data_url(member.photo_data_url)
+                        except ImageDataError as error:
+                            raise HTTPException(
+                                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                                detail=str(error),
+                            ) from error
+                        cursor.execute(
+                            "INSERT INTO storyboard_assets "
+                            "(story_id, asset_kind, mime_type, content, sha256) "
+                            "VALUES (%s, 'CHARACTER_REFERENCE', %s, %s, %s) RETURNING id",
+                            (story_id, image.mime_type, image.content, image.sha256),
+                        )
+                        asset_id = UUID(str(cast(tuple[object, ...], cursor.fetchone())[0]))
+                        cursor.execute(
+                            "INSERT INTO character_visual_references "
+                            "(story_id, entity_id, asset_id, source, version) "
+                            "VALUES (%s, %s, %s, 'UPLOADED', 1)",
+                            (story_id, entity_id, asset_id),
+                        )
                     if index == 0:
                         focal_id = entity_id
             else:

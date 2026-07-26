@@ -20,6 +20,7 @@ import json
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
+from typing import cast
 
 _UPLOAD_ROOT = Path(__file__).resolve().parents[3] / "indicf5_tts" / "ref_uploads"
 
@@ -68,7 +69,7 @@ def _load_metadata(user_id: str) -> dict[str, dict[str, str]]:
     if not path.exists():
         return {}
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        return cast(dict[str, dict[str, str]], json.loads(path.read_text(encoding="utf-8")))
     except json.JSONDecodeError:
         return {}
 
@@ -123,7 +124,10 @@ def save_character_voice(
     _save_metadata(user_id, metadata)
 
     return UploadedVoice(
-        character_name=name, file_path=file_path, ref_text=ref_text.strip(), content_type=content_type
+        character_name=name,
+        file_path=file_path,
+        ref_text=ref_text.strip(),
+        content_type=content_type,
     )
 
 
@@ -151,4 +155,3 @@ def delete_character_voice(*, user_id: str, character_name: str) -> bool:
     (_user_dir(user_id) / entry["filename"]).unlink(missing_ok=True)
     _save_metadata(user_id, metadata)
     return True
-

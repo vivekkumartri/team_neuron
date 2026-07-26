@@ -70,7 +70,7 @@ def test_story_input_accepts_a_full_edited_cast() -> None:
                 "voice": "Terse, dry humor",
                 "traits": "Cautious, loyal",
                 "visual": "Grease-stained hands",
-                "is_protagonist": True,
+                "background_story": "A careful watchmaker raised in the lower city.",
             },
             {
                 "name": "Mira Voss",
@@ -78,12 +78,11 @@ def test_story_input_accepts_a_full_edited_cast() -> None:
                 "voice": "Clipped",
                 "traits": "Rule-bound",
                 "visual": "Brass mask",
-                "is_protagonist": False,
             },
         ],
     )
     assert len(payload.cast) == 2
-    assert payload.cast[0].is_protagonist is True
+    assert payload.cast[0].background_story.startswith("A careful")
     # No `hidden` field exists on the model at all (task.md 0.4): passing one
     # is rejected outright by `extra="forbid"`.
 
@@ -113,8 +112,23 @@ def test_story_input_rejects_a_hidden_field_on_a_cast_member() -> None:
 
 def test_story_input_rejects_more_than_six_cast_members() -> None:
     seven_members = [
-        {"name": f"Character {i}", "role": "Supporting", "is_protagonist": i == 0}
-        for i in range(7)
+        {"name": f"Character {i}", "role": "Supporting"} for i in range(7)
     ]
     with pytest.raises(ValidationError):
         StoryInput(title="A crowded cast", language="en", cast=seven_members)
+
+
+def test_story_input_accepts_optional_scenario_and_character_photo() -> None:
+    payload = StoryInput(
+        title="The lighthouse signal",
+        scenario="A keeper investigates a dark beacon before dawn.",
+        cast=[
+            {
+                "name": "Mira",
+                "visual": "Blue coat and brass lantern",
+                "photo_data_url": "data:image/png;base64,ZmFrZS1pbWFnZQ==",
+            }
+        ],
+    )
+    assert payload.scenario.startswith("A keeper")
+    assert payload.cast[0].photo_data_url is not None
