@@ -17,7 +17,42 @@ from pydantic import BaseModel
 from story_engine.api.auth import AuthenticatedUser, authenticate_request, tenant_connection
 
 router = APIRouter(prefix="/api/v1/chapters", tags=["chapters"])
+branch_chapters_router = APIRouter(prefix="/api/v1/branches", tags=["chapters"])
 CurrentUser = Annotated[AuthenticatedUser, Depends(authenticate_request)]
+
+
+class ChapterSummary(BaseModel):
+    id: UUID
+    chapter_index: int
+    status: str
+    published_at: str | None
+
+
+@branch_chapters_router.get("/{branch_id}/chapters", response_model=list[ChapterSummary])
+def list_branch_chapters(branch_id: UUID, user: CurrentUser) -> list[ChapterSummary]:
+    """Published chapters for a branch, oldest first — lets the client find
+
+    the chapter a just-finished generation job produced (the job/progression
+    response never returns a chapter id directly, only a job id).
+    """
+
+    with tenant_connection(user) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT id, chapter_index, status, published_at FROM chapters "
+                "WHERE branch_id = %s ORDER BY chapter_index",
+                (branch_id,),
+            )
+            rows = cast(list[tuple[Any, ...]], cursor.fetchall())
+    return [
+        ChapterSummary(
+            id=UUID(str(row[0])),
+            chapter_index=int(row[1]),
+            status=str(row[2]),
+            published_at=str(row[3]) if row[3] is not None else None,
+        )
+        for row in rows
+    ]
 
 
 class DialogueLine(BaseModel):

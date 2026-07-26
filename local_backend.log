@@ -1,0 +1,75 @@
+INFO:     Will watch for changes in these directories: ['/Users/vivek.trivedi/Desktop/hackathon']
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [93645] using WatchFiles
+INFO:     Started server process [93649]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:65516 - "POST /api/v1/me/personalization-snapshots HTTP/1.1" 201 Created
+INFO:     127.0.0.1:65516 - "POST /api/v1/stories/cast-proposal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65520 - "POST /api/v1/stories/cast-proposal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49395 - "POST /api/v1/stories HTTP/1.1" 201 Created
+INFO:     127.0.0.1:49399 - "OPTIONS /api/v1/branches/6866f92b-5f91-43ba-a42c-1e1d34d22fac/progression HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49395 - "POST /api/v1/branches/6866f92b-5f91-43ba-a42c-1e1d34d22fac/progression HTTP/1.1" 429 Too Many Requests
+WARNING:  WatchFiles detected changes in 'src/story_engine/services/quotas.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [93649]
+INFO:     Started server process [94901]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:50655 - "POST /api/v1/stories HTTP/1.1" 201 Created
+INFO:     127.0.0.1:50660 - "OPTIONS /api/v1/branches/09c6e29f-e91b-4e5c-ba4c-58696d6a4a3e/progression HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50655 - "POST /api/v1/branches/09c6e29f-e91b-4e5c-ba4c-58696d6a4a3e/progression HTTP/1.1" 201 Created
+INFO:     127.0.0.1:50674 - "GET /api/v1/generation-jobs/d7da4006-56d5-4e95-9c6a-49ecd4c1af21/events HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50655 - "GET /api/v1/stories HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50668 - "GET /api/v1/branches/09c6e29f-e91b-4e5c-ba4c-58696d6a4a3e/chapters HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50669 - "GET /api/v1/me/quota HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50682 - "GET /api/v1/branches/09c6e29f-e91b-4e5c-ba4c-58696d6a4a3e/chapters HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50655 - "GET /api/v1/stories HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50668 - "GET /api/v1/me/quota HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50674 - "GET /api/v1/branches/09c6e29f-e91b-4e5c-ba4c-58696d6a4a3e/chapters HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51238 - "GET /api/v1/branches/09c6e29f-e91b-4e5c-ba4c-58696d6a4a3e/chapters HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51238 - "GET /api/v1/chapters/bc21758b-8422-4061-9bd7-b6207e2624e5 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51387 - "POST /api/v1/branches/09c6e29f-e91b-4e5c-ba4c-58696d6a4a3e/progression HTTP/1.1" 201 Created
+INFO:     127.0.0.1:51395 - "GET /api/v1/generation-jobs/5a31d9db-4fd8-4dd4-acf8-2863e14cdf52/events HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51393 - "GET /api/v1/branches/09c6e29f-e91b-4e5c-ba4c-58696d6a4a3e/chapters HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51387 - "GET /api/v1/me/quota HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51402 - "GET /api/v1/branches/09c6e29f-e91b-4e5c-ba4c-58696d6a4a3e/chapters HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51532 - "GET /api/v1/chapters/bc21758b-8422-4061-9bd7-b6207e2624e5 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51395 - "GET /api/v1/branches/09c6e29f-e91b-4e5c-ba4c-58696d6a4a3e/chapters HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51395 - "GET /api/v1/branches/09c6e29f-e91b-4e5c-ba4c-58696d6a4a3e/chapters HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51395 - "GET /api/v1/chapters/af78bec7-c264-45cd-aa4f-bd9ca741cc0b HTTP/1.1" 200 OK
+WARNING:  WatchFiles detected changes in 'src/story_engine/api/routes/cast.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [94901]
+INFO:     Started server process [98521]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'src/story_engine/api/routes/cast.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [98521]
+INFO:     Started server process [98670]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'src/story_engine/app.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [98670]
+INFO:     Started server process [98701]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'src/story_engine/app.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [98701]
+INFO:     Started server process [98717]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:53407 - "GET /api/v1/me/quota HTTP/1.1" 200 OK

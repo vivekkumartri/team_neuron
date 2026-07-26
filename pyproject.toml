@@ -32,6 +32,11 @@ dev = [
   "ruff>=0.6,<1.0",
   "mypy>=1.11,<2.0",
   "build>=1.2,<2.0",
+  # Local-only convenience: `api/settings.py` loads `.env` (gitignored) when
+  # present so `OPENAI_API_KEY`/`LOCAL_DATABASE_URL`/etc. don't need to be
+  # re-exported in every new terminal. Never required in the deployed App
+  # (Databricks injects these as real env vars; no .env file exists there).
+  "python-dotenv>=1.0,<2.0",
 ]
 
 [project.entry-points.packages]

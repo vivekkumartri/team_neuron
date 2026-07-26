@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { apiBase } from "./api-client";
+
 export interface GenerationActivityEvent {
   sequence: number;
   summary: string;
@@ -38,7 +40,9 @@ export function useGenerationStream(jobId: string | null): {
     if (!jobId) return;
 
     setConnectionState("connecting");
-    const source = new EventSource(`/api/v1/generation-jobs/${jobId}/events`);
+    const source = new EventSource(`${apiBase()}/generation-jobs/${jobId}/events`, {
+      withCredentials: true,
+    });
     sourceRef.current = source;
 
     source.onopen = () => setConnectionState("open");

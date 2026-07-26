@@ -58,12 +58,22 @@ _PROTAGONIST_ROLE_MARKERS = (
 _CAST_PROPOSAL_SYSTEM_PROMPT = (
     "CastProposal v1: Given a short story seed, propose between 2 and 4 starting "
     "characters for the cast, the first of whom must be the protagonist. "
+    "A character is not necessarily a human — base every character's species "
+    "and nature on what actually fits the seed. A protagonist (or any cast "
+    "member) may just as well be an animal (a fish, an elephant, a fox), a "
+    "plant or tree, an object, a spirit, or anything else the story seed "
+    "implies; never default to a human character out of habit if the seed "
+    "suggests otherwise. "
     "Respond with ONLY a JSON array (no prose, no markdown fences). Each element "
     "must be an object with exactly these string fields: "
-    '"name" (a proper name), '
-    '"role" (a short descriptor, e.g. "Protagonist · Rogue Watchmaker"; the '
-    "first character's role must clearly indicate they are the protagonist), "
-    '"voice" (their dialogue style), '
+    '"name" (a fitting name for whatever this character is — a person\'s name, '
+    'an animal\'s name, or simply what it is, e.g. "the old oak tree"), '
+    '"role" (a short descriptor including what kind of being/thing this '
+    'character is, e.g. "Protagonist · Wandering elephant matriarch" or '
+    '"Protagonist · Rogue Watchmaker"; the first character\'s role must '
+    "clearly indicate they are the protagonist), "
+    '"voice" (their dialogue style, or how they communicate/express themselves '
+    "if they don't literally speak), "
     '"traits" (comma-separated core personality traits), '
     '"visual" (comma-separated visual attributes). '
     "Do not include any hidden, secret, or concealed fields — every field you "

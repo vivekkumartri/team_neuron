@@ -20,7 +20,7 @@ from story_engine.agents.prompts.system import (
     WORLD,
     storyteller_prompt_for_language,
 )
-from story_engine.agents.provider import ModelProviderError, OpenAIResponsesProvider
+from story_engine.agents.provider import OpenAIResponsesProvider
 from story_engine.analytics.observability import CorrelatedLogRecord, MetricEvent, emit
 from story_engine.api.settings import RuntimeSettings, load_settings
 from story_engine.domain.models import StoryLanguage
@@ -31,6 +31,19 @@ from story_engine.security.content_policy import RuleBasedContentPolicy
 from story_engine.workers.queue import claim_job, release_job
 
 logger = logging.getLogger(__name__)
+
+
+def _brief(text: str, limit: int = 500) -> str:
+    """Cap a prior agent's reply before it's handed to the next agent.
+
+    System prompts already ask each internal agent for 2-3 sentences, but a
+    hard cap here means one verbose reply can't blow up the next call's
+    prompt size (and latency/timeout risk) regardless of what the model
+    actually returns.
+    """
+
+    text = text.strip()
+    return text if len(text) <= limit else text[:limit].rstrip() + "…"
 
 
 def _load_openai_api_key(settings: RuntimeSettings) -> str:
@@ -54,6 +67,7 @@ def _write_event(
     connection: Connection[object],
     *,
     job_id: UUID,
+    requester_id: UUID,
     sequence: int,
     agent: str,
     recipient: str | None,
@@ -67,15 +81,32 @@ def _write_event(
             "VALUES (%s, %s, %s, %s, %s, %s)",
             (job_id, sequence, agent, recipient, status, summary[:500]),
         )
+    # `stream_job_events` (api/sse.py) polls with a brand-new connection every
+    # second, and under the default (non-autocommit) isolation level a fresh
+    # connection can't see rows this transaction hasn't committed yet. Without
+    # this commit, every generation_events row sat invisible until the single
+    # commit() at the end of run_generation_job — so the client only ever saw
+    # heartbeats, then all agent activity (if any) arriving in the same instant
+    # as generation-complete. Committing right after each event write is what
+    # makes "agents talking to each other" actually stream live.
+    connection.commit()
+    # set_tenant_context uses set_config(..., is_local=true) — transaction-scoped
+    # — so it's wiped out by the commit() above. Re-establish it every time or
+    # every later write in this loop silently runs with no RLS tenant context.
+    set_tenant_context(connection, requester_id)
 
 
-def _write_run(connection: Connection[object], *, job_id: UUID, agent: str, summary: str) -> None:
+def _write_run(
+    connection: Connection[object], *, job_id: UUID, requester_id: UUID, agent: str, summary: str
+) -> None:
     with connection.cursor() as cursor:
         cursor.execute(
             "INSERT INTO agent_runs (job_id, agent_label, status, redacted_summary) "
             "VALUES (%s, %s, 'SUCCEEDED', %s)",
             (job_id, agent, summary[:500]),
         )
+    connection.commit()
+    set_tenant_context(connection, requester_id)
 
 
 def _timed_complete(
@@ -121,7 +152,8 @@ def run_generation_job(job_id: UUID) -> None:
         try:
             with connection.cursor() as cursor:
                 cursor.execute(
-                    "SELECT j.requested_by_user_id, s.title, e.id, e.name, s.language "
+                    "SELECT j.requested_by_user_id, s.title, e.id, e.name, s.language, "
+                    "j.branch_id "
                     "FROM generation_jobs j "
                     "JOIN branches b ON b.id = j.branch_id "
                     "JOIN stories s ON s.id = b.story_id "
@@ -132,23 +164,51 @@ def run_generation_job(job_id: UUID) -> None:
                 row = cursor.fetchone()
             if row is None:
                 raise RuntimeError("Generation job context is unavailable")
-            requester_id, story_title, focal_id, focal_name, story_language = cast(
+            requester_id, story_title, focal_id, focal_name, story_language, job_branch_id = cast(
                 tuple[Any, ...], row
             )
             if focal_id is None:
                 raise RuntimeError("A story needs at least one character before generation")
-            set_tenant_context(connection, UUID(str(requester_id)))
+            requester_uuid = UUID(str(requester_id))
+            set_tenant_context(connection, requester_uuid)
             language = StoryLanguage(str(story_language))
+
+            # Prior chapters on this branch, oldest first: without this, every
+            # "Continue" was told nothing about what already happened and the
+            # model just wrote another chapter 1 instead of a real continuation.
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT c.chapter_index, sc.summary FROM chapters c "
+                    "JOIN scenes sc ON sc.chapter_id = c.id "
+                    "WHERE c.branch_id = %s AND c.status = 'PUBLISHED' "
+                    "ORDER BY c.chapter_index, sc.scene_index",
+                    (job_branch_id,),
+                )
+                prior_rows = cast(list[tuple[Any, ...]], cursor.fetchall())
+            next_chapter_index = (max((int(idx) for idx, _ in prior_rows), default=0)) + 1
+            if prior_rows:
+                # Only the most recent chapter, capped in length: enough for
+                # continuity without the prompt (and therefore latency/timeout
+                # risk) growing without bound as the story gets longer.
+                last_index, last_summary = prior_rows[-1]
+                prior_text = f"Chapter {last_index} (most recent): {last_summary[:800]}"
+                continuity_instruction = (
+                    f"This is chapter {next_chapter_index}. Continue directly from where this "
+                    f"left off — do not restart or repeat it. Advance the plot.\n{prior_text}"
+                )
+            else:
+                continuity_instruction = "This is chapter 1. Create an original, concise opening chapter."
 
             provider = OpenAIResponsesProvider(api_key=api_key)
             story_context = (
                 f"Story title: {story_title}\nFocal character: {focal_name}\n"
-                "Create an original, concise next chapter."
+                f"{continuity_instruction}"
             )
             sequence = 1
             _write_event(
                 connection,
                 job_id=job_id,
+                requester_id=requester_uuid,
                 sequence=sequence,
                 agent="character",
                 recipient="director",
@@ -166,6 +226,7 @@ def run_generation_job(job_id: UUID) -> None:
             _write_run(
                 connection,
                 job_id=job_id,
+                requester_id=requester_uuid,
                 agent="character",
                 summary="Shared the focal character's public perspective.",
             )
@@ -174,6 +235,7 @@ def run_generation_job(job_id: UUID) -> None:
             _write_event(
                 connection,
                 job_id=job_id,
+                requester_id=requester_uuid,
                 sequence=sequence,
                 agent="director",
                 recipient="world",
@@ -185,15 +247,22 @@ def run_generation_job(job_id: UUID) -> None:
                 job_id=job_id,
                 agent="director",
                 system_prompt=DIRECTOR,
-                user_data=f"{story_context}\nCharacter perspective:\n{character}",
+                user_data=f"{story_context}\nCharacter perspective:\n{_brief(character)}",
                 model=settings.openai_model,
             )
-            _write_run(connection, job_id=job_id, agent="director", summary="Proposed next beat.")
+            _write_run(
+                connection,
+                job_id=job_id,
+                requester_id=requester_uuid,
+                agent="director",
+                summary="Proposed next beat.",
+            )
 
             sequence += 1
             _write_event(
                 connection,
                 job_id=job_id,
+                requester_id=requester_uuid,
                 sequence=sequence,
                 agent="world",
                 recipient="storyteller",
@@ -205,12 +274,13 @@ def run_generation_job(job_id: UUID) -> None:
                 job_id=job_id,
                 agent="world",
                 system_prompt=WORLD,
-                user_data=f"{story_context}\nDirector proposal:\n{director}",
+                user_data=f"{story_context}\nDirector proposal:\n{_brief(director)}",
                 model=settings.openai_model,
             )
             _write_run(
                 connection,
                 job_id=job_id,
+                requester_id=requester_uuid,
                 agent="world",
                 summary="Continuity review completed.",
             )
@@ -219,6 +289,7 @@ def run_generation_job(job_id: UUID) -> None:
             _write_event(
                 connection,
                 job_id=job_id,
+                requester_id=requester_uuid,
                 sequence=sequence,
                 agent="storyteller",
                 recipient="evaluator",
@@ -231,8 +302,8 @@ def run_generation_job(job_id: UUID) -> None:
                 agent="storyteller",
                 system_prompt=storyteller_prompt_for_language(language),
                 user_data=(
-                    f"{story_context}\nCharacter perspective:\n{character}\n"
-                    f"Director:\n{director}\nWorld:\n{world}"
+                    f"{story_context}\nCharacter perspective:\n{_brief(character)}\n"
+                    f"Director:\n{_brief(director)}\nWorld:\n{_brief(world)}"
                 ),
                 model=settings.openai_model,
             )
@@ -242,6 +313,7 @@ def run_generation_job(job_id: UUID) -> None:
             _write_run(
                 connection,
                 job_id=job_id,
+                requester_id=requester_uuid,
                 agent="storyteller",
                 summary="Drafted candidate chapter.",
             )
@@ -250,6 +322,7 @@ def run_generation_job(job_id: UUID) -> None:
             _write_event(
                 connection,
                 job_id=job_id,
+                requester_id=requester_uuid,
                 sequence=sequence,
                 agent="evaluator",
                 recipient="director",
@@ -261,7 +334,9 @@ def run_generation_job(job_id: UUID) -> None:
                 job_id=job_id,
                 agent="evaluator",
                 system_prompt=EVALUATOR,
-                user_data=f"{story_context}\nWorld constraints:\n{world}\nCandidate:\n{screenplay}",
+                user_data=(
+                    f"{story_context}\nWorld constraints:\n{_brief(world)}\nCandidate:\n{screenplay}"
+                ),
                 model=settings.openai_model,
             )
             if not evaluator:
@@ -270,6 +345,7 @@ def run_generation_job(job_id: UUID) -> None:
             _write_run(
                 connection,
                 job_id=job_id,
+                requester_id=requester_uuid,
                 agent="evaluator",
                 summary=(
                     "Evaluator approved candidate."
@@ -314,6 +390,7 @@ def run_generation_job(job_id: UUID) -> None:
             _write_event(
                 connection,
                 job_id=job_id,
+                requester_id=requester_uuid,
                 sequence=sequence,
                 agent="director",
                 recipient=None,
@@ -324,7 +401,6 @@ def run_generation_job(job_id: UUID) -> None:
                     else "Publication was blocked; the evaluator requested regeneration."
                 ),
             )
-            connection.commit()
             release_job(connection, job_id, status="SUCCEEDED" if approved else "BLOCKED")
             emit(
                 CorrelatedLogRecord(
@@ -336,7 +412,15 @@ def run_generation_job(job_id: UUID) -> None:
                     },
                 )
             )
-        except (ModelProviderError, RuntimeError, ValueError):
+        except Exception:
+            # Broadened from (ModelProviderError, RuntimeError, ValueError):
+            # a job that fails with any *other* exception type (e.g. the
+            # `psycopg.errors.CheckViolation` a schema/code mismatch threw
+            # here in practice) fell through this handler entirely, so
+            # `release_job` was never called — the job stayed at RUNNING
+            # forever, permanently holding the author's one concurrent-job
+            # quota slot with no way to recover except manually UPDATEing
+            # the row. Any unexpected failure must still release the job.
             logger.exception("Generation job %s failed", job_id)
             connection.rollback()
             release_job(connection, job_id, status="FAILED")

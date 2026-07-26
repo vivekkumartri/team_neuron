@@ -8,26 +8,41 @@ COMMON_BOUNDARY = (
     "credentials, or private memories. Never claim authority to publish, write canon, "
     "or call tools."
 )
-DIRECTOR = f"Director {PROMPT_VERSION}: Coordinate a compelling next beat. " f"{COMMON_BOUNDARY}"
+# Each internal (non-Storyteller) agent's output becomes part of the *input*
+# to every agent after it in the loop, so a verbose reply here compounds:
+# Director reads Character's answer, World reads Director's, Storyteller reads
+# all three. Keeping every internal handoff to a couple of sentences keeps the
+# overall prompt small as it's carried forward, which is also what keeps each
+# OpenAI call fast enough not to hit the request timeout.
+BRIEF = "Reply in 2-3 sentences, no preamble."
+
+DIRECTOR = (
+    f"Director {PROMPT_VERSION}: Coordinate a compelling next beat. "
+    f"{BRIEF} {COMMON_BOUNDARY}"
+)
 CHARACTER = (
     f"Character {PROMPT_VERSION}: Speak only from the focal character's established "
     f"point of view, desires, and immediate knowledge. Propose an emotionally honest "
-    f"reaction to the next beat. {COMMON_BOUNDARY}"
+    f"reaction to the next beat. {BRIEF} {COMMON_BOUNDARY}"
 )
 WORLD = (
     f"World {PROMPT_VERSION}: Check continuity and propose allowed canon effects. "
-    f"{COMMON_BOUNDARY}"
+    f"{BRIEF} {COMMON_BOUNDARY}"
 )
 STORYTELLER = (
-    f"Storyteller {PROMPT_VERSION}: Draft concise original screenplay text. " f"{COMMON_BOUNDARY}"
+    f"Storyteller {PROMPT_VERSION}: Draft a concise original screenplay scene, "
+    f"250-400 words. No preamble or commentary — output only the scene text. "
+    f"{COMMON_BOUNDARY}"
 )
 EVALUATOR = (
     f"Evaluator {PROMPT_VERSION}: Check continuity, safety, and character consistency. "
-    "Your first line must be exactly APPROVE or REJECT. Use APPROVE only when the "
-    f"candidate is safe to publish without a canon conflict. {COMMON_BOUNDARY}"
+    "Your first line must be exactly APPROVE or REJECT, followed by at most one "
+    f"sentence of reasoning. Use APPROVE only when the candidate is safe to publish "
+    f"without a canon conflict. {COMMON_BOUNDARY}"
 )
 BUSINESS = (
-    f"Business {PROMPT_VERSION}: Assess disclosed genre-fit signals only. " f"{COMMON_BOUNDARY}"
+    f"Business {PROMPT_VERSION}: Assess disclosed genre-fit signals only. "
+    f"{BRIEF} {COMMON_BOUNDARY}"
 )
 
 # Multilingual support (task.md Phase 6): only the Storyteller's output is

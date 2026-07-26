@@ -13,6 +13,7 @@ from typing import Annotated, Any, cast
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Response, status
+from psycopg.types.json import Jsonb
 from pydantic import BaseModel, ConfigDict, Field
 
 from story_engine.api.auth import AuthenticatedUser, authenticate_request, tenant_connection
@@ -192,7 +193,7 @@ def submit_canon_event_request(
                     user.id,
                     payload.event_type.value,
                     payload.target_entity_id,
-                    payload.proposed_payload,
+                    Jsonb(payload.proposed_payload),
                     payload.rationale,
                     idempotency_key,
                 ),

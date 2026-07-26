@@ -18,8 +18,9 @@ from fastapi import APIRouter, Depends, Header, HTTPException, status
 from pydantic import BaseModel, ConfigDict
 
 from story_engine.api.auth import AuthenticatedUser, authenticate_request, tenant_connection
+from story_engine.api.settings import load_settings
 from story_engine.domain.models import ProgressionMode, ProgressionRequest
-from story_engine.services.databricks_jobs import DatabricksJobLauncher, JobLaunchError
+from story_engine.services.databricks_jobs import JobLaunchError, get_job_launcher
 from story_engine.services.progression import ProgressionError, target_branch_for_progression
 from story_engine.services.quotas import (
     QuotaCategory,
@@ -179,7 +180,7 @@ def submit_progression(
             )
         connection.commit()
         try:
-            DatabricksJobLauncher().launch(job_key="generation_job", job_id=job_id)
+            get_job_launcher(load_settings()).launch(job_key="generation_job", job_id=job_id)
         except JobLaunchError as error:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,

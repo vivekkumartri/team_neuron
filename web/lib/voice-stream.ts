@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { apiWsBase } from "./api-client";
+
 /**
  * Client for `WS /api/v1/voice/transcribe`.
  *
@@ -34,7 +36,6 @@ export interface VoiceTranscriptState {
   stop: () => void;
 }
 
-const WS_PATH = "/api/v1/voice/transcribe";
 const DEFAULT_CHUNK_INTERVAL_MS = 2500;
 
 /**
@@ -45,9 +46,8 @@ const DEFAULT_CHUNK_INTERVAL_MS = 2500;
  * story language keep working unchanged (server-side default is "no hint").
  */
 function wsUrl(language?: string | null): string {
-  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
   const query = language ? `?language=${encodeURIComponent(language)}` : "";
-  return `${protocol}//${window.location.host}${WS_PATH}${query}`;
+  return `${apiWsBase()}/voice/transcribe${query}`;
 }
 
 export function useVoiceTranscription(

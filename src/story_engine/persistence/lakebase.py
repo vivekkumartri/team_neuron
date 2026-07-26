@@ -21,7 +21,18 @@ logger = logging.getLogger(__name__)
 
 @contextmanager
 def lakebase_connection(settings: RuntimeSettings) -> Iterator[Connection[object]]:
-    """Open one OAuth-authenticated Lakebase connection without persisting tokens."""
+    """Open one OAuth-authenticated Lakebase connection without persisting tokens.
+
+    `settings.local_database_url` is a local-only escape hatch (docker-compose
+    Postgres has no Lakebase/OAuth to talk to) — it is only ever populated
+    from the `LOCAL_DATABASE_URL` env var, which `databricks.yml` never sets,
+    so this branch is structurally unreachable in the deployed App.
+    """
+
+    if settings.local_database_url:
+        with connect(settings.local_database_url, connect_timeout=5) as connection:
+            yield connection
+        return
 
     if not settings.database_resource_bound:
         raise RuntimeError("Lakebase resource is not bound")

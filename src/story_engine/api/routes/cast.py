@@ -19,6 +19,7 @@ from pydantic import BaseModel
 from story_engine.api.auth import AuthenticatedUser, authenticate_request, tenant_connection
 
 router = APIRouter(prefix="/api/v1/stories", tags=["cast"])
+branch_cast_router = APIRouter(prefix="/api/v1/branches", tags=["cast"])
 CurrentUser = Annotated[AuthenticatedUser, Depends(authenticate_request)]
 
 
@@ -145,3 +146,116 @@ def get_family_tree(story_id: UUID, user: CurrentUser) -> FamilyTreeResponse:
             for row in rows
         ],
     )
+
+
+class AddCastMemberRequest(BaseModel):
+    name: str
+
+
+@branch_cast_router.get("/{branch_id}/cast-members", response_model=list[CastMember])
+def list_branch_cast_members(branch_id: UUID, user: CurrentUser) -> list[CastMember]:
+    """The story's current cast, resolved from a branch id — the workspace
+
+    screen only ever has a branch id in hand, not the story id.
+    """
+
+    with tenant_connection(user) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT cm.entity_id, e.name, cm.role FROM cast_members cm "
+                "JOIN entities e ON e.id = cm.entity_id "
+                "JOIN branches b ON b.story_id = cm.story_id "
+                "WHERE b.id = %s ORDER BY cm.created_at",
+                (branch_id,),
+            )
+            rows = cast(list[tuple[Any, ...]], cursor.fetchall())
+    return [
+        CastMember(entity_id=UUID(str(row[0])), name=str(row[1]), role=str(row[2])) for row in rows
+    ]
+
+
+@branch_cast_router.post(
+    "/{branch_id}/cast-members", response_model=CastMember, status_code=status.HTTP_201_CREATED
+)
+def add_cast_member(
+    branch_id: UUID, payload: AddCastMemberRequest, user: CurrentUser
+) -> CastMember:
+    """Introduce a new supporting character to the story mid-run.
+
+    Unlike the founding cast (`create_story`/`lock_cast`), this never creates
+    a PROTAGONIST — reassigning the protagonist is a separate, unbuilt
+    workflow, not something a one-field "add character" form should do
+    implicitly. `entities` still has PUBLIC INSERT (migration 0008 only
+    revoked UPDATE/DELETE), so this plain INSERT matches the existing
+    canonical-write boundary the same way `create_story` already does.
+    """
+
+    name = payload.name.strip()
+    if not name:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Name is required")
+
+    with tenant_connection(user) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT story_id FROM branches WHERE id = %s", (branch_id,))
+            branch_row = cursor.fetchone()
+            if branch_row is None:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Branch not found")
+            story_id = cast(tuple[Any, ...], branch_row)[0]
+
+            try:
+                cursor.execute(
+                    "INSERT INTO entities (story_id, name, entity_type, founding_branch_id) "
+                    "VALUES (%s, %s, 'character', %s) RETURNING id",
+                    (story_id, name, branch_id),
+                )
+            except Exception as error:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="A character with that name already exists in this story",
+                ) from error
+            entity_id = cast(tuple[Any, ...], cursor.fetchone())[0]
+
+            cursor.execute(
+                "INSERT INTO cast_members (story_id, entity_id, role) VALUES (%s, %s, 'SUPPORTING')",
+                (story_id, entity_id),
+            )
+        connection.commit()
+
+    return CastMember(entity_id=UUID(str(entity_id)), name=name, role="SUPPORTING")
+
+
+@branch_cast_router.delete("/{branch_id}/cast-members/{entity_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_cast_member(branch_id: UUID, entity_id: UUID, user: CurrentUser) -> None:
+    """Remove a character from the story's active cast.
+
+    This deletes only the `cast_members` row, never the `entities` row
+    itself — `entities` has no DELETE grant for PUBLIC (migration 0008) and,
+    more importantly, published chapters/scenes/dialogue may already
+    reference this character; removing it from the cast should stop it being
+    offered as a focal character going forward without rewriting history.
+    The PROTAGONIST can't be removed this way — swap protagonists first
+    (unbuilt workflow) rather than leaving a story with none.
+    """
+
+    with tenant_connection(user) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT cm.role FROM cast_members cm "
+                "JOIN branches b ON b.story_id = cm.story_id "
+                "WHERE b.id = %s AND cm.entity_id = %s",
+                (branch_id, entity_id),
+            )
+            row = cursor.fetchone()
+            if row is None:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cast member not found")
+            if cast(tuple[Any, ...], row)[0] == "PROTAGONIST":
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="The protagonist can't be removed from the cast",
+                )
+            cursor.execute(
+                "DELETE FROM cast_members WHERE story_id = "
+                "(SELECT story_id FROM branches WHERE id = %s) AND entity_id = %s",
+                (branch_id, entity_id),
+            )
+        connection.commit()

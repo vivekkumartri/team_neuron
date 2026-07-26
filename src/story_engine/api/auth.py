@@ -24,16 +24,26 @@ class AuthenticatedUser:
 
 
 def authenticate_request(request: Request) -> AuthenticatedUser:
-    """Trust identity headers injected by the Databricks Apps reverse proxy."""
+    """Trust identity headers injected by the Databricks Apps reverse proxy.
 
+    Locally there is no such proxy, so `settings.local_dev_mode` (only ever
+    true when a developer explicitly exports `STORY_ENGINE_LOCAL_DEV=1` —
+    never set by `databricks.yml`) substitutes one fixed dev identity instead
+    of every request 401ing. This never activates in the deployed App.
+    """
+
+    settings = load_settings()
     databricks_user_id = request.headers.get("x-forwarded-user")
     email = request.headers.get("x-forwarded-email")
     if not databricks_user_id or not email:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required"
-        )
+        if settings.local_dev_mode:
+            databricks_user_id, email = "local-dev-user", "dev@localhost"
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required"
+            )
 
-    with lakebase_connection(load_settings()) as connection:
+    with lakebase_connection(settings) as connection:
         with connection.cursor() as cursor:
             cursor.execute("SELECT app_provision_user(%s, %s)", (databricks_user_id, email))
             row = cursor.fetchone()

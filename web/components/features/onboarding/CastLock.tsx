@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { apiFetch } from "../../../lib/api-client";
+import { ApiError, apiFetch } from "../../../lib/api-client";
 import type { CastCharacter } from "./CastEditor";
 import type { StoryLanguageCode } from "./LanguagePicker";
 
@@ -67,9 +67,29 @@ export function CastLock({
       );
       window.localStorage.setItem("story-engine-active-branch", story.initial_branch_id);
       window.localStorage.setItem("story-engine-active-job", job.job_id);
+      // So `WorkspaceView` can prefill "Focal entity ID" for this branch
+      // instead of requiring the author to hand-type a raw UUID (which,
+      // left blank, sent "" and produced a 422 the UI rendered unreadably).
+      window.localStorage.setItem(
+        `story-engine-focal-entity-${story.initial_branch_id}`,
+        story.initial_focal_entity_id,
+      );
       onLocked(story.id);
-    } catch {
-      setError("Couldn't lock the cast — nothing was created. Try again.");
+    } catch (caught) {
+      // Surface the real backend reason instead of a generic message — a
+      // silent catch-all here is exactly what hid the duplicate-cast-name
+      // 500 (`entities` has UNIQUE (story_id, name)) from the author.
+      if (caught instanceof ApiError) {
+        setError(
+          caught.status === 409
+            ? "Two characters in your cast have the same name — give each a unique name and try again."
+            : `Couldn't lock the cast: ${caught.message}`,
+        );
+      } else if (caught instanceof Error) {
+        setError(`Couldn't lock the cast: ${caught.message}`);
+      } else {
+        setError("Couldn't lock the cast — nothing was created. Try again.");
+      }
     } finally {
       setLocking(false);
     }

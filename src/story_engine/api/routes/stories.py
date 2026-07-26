@@ -195,6 +195,18 @@ def create_story(payload: StoryInput, user: CurrentUser) -> StoryResponse:
             branch_id = UUID(str(cast(tuple[object, ...], cursor.fetchone())[0]))
 
             cast_input = payload.cast
+            if cast_input:
+                seen_names = {member.name.strip().casefold() for member in cast_input}
+                if len(seen_names) != len(cast_input):
+                    # `entities` enforces UNIQUE (story_id, name) — without this
+                    # check, two cast members sharing a name (e.g. left as the
+                    # editor's default, or both edited to the same value) hit
+                    # an unhandled UniqueViolation here and surfaced to the
+                    # author as a generic 500 with no explanation.
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail="Two characters in your cast have the same name. Give each a unique name and try again.",
+                    )
             focal_id: UUID | None = None
             if cast_input:
                 # One `entities` row per author-edited character, not just a

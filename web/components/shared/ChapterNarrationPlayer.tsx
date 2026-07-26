@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { apiBase } from "../../lib/api-client";
+
 /**
  * Plays back the narrator-voice reading of a published chapter via
  * `GET /api/v1/chapters/:id/narration` (`api/routes/narration.py`). Fetches
@@ -28,7 +30,7 @@ export function ChapterNarrationPlayer({ chapterId }: { chapterId: string }) {
     }
     setStatus("loading");
     try {
-      const response = await fetch(`/api/v1/chapters/${chapterId}/narration`, {
+      const response = await fetch(`${apiBase()}/chapters/${chapterId}/narration`, {
         credentials: "include",
       });
       if (!response.ok) {

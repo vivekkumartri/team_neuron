@@ -106,7 +106,10 @@ def current_quota_states(connection: object, *, user_id: object) -> list[QuotaSt
 
         cursor.execute(
             "SELECT count(*) FROM generation_jobs "
-            "WHERE requested_by_user_id = %s AND status IN ('QUEUED', 'RUNNING')",
+            "WHERE requested_by_user_id = %s AND ("
+            "  status = 'QUEUED' "
+            "  OR (status = 'RUNNING' AND (lease_expires_at IS NULL OR lease_expires_at >= now()))"
+            ")",
             (user_id,),
         )
         active_jobs = int(cast(tuple[Any, ...], cursor.fetchone())[0])
