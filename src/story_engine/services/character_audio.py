@@ -28,11 +28,17 @@ from story_engine.services.voice_casting import (
     cast_voices,
     load_voice_library,
     match_voice,
+    propose_voice_archetypes,
 )
 from story_engine.services.voice_uploads import UploadedVoice
 
 _TTS_ROOT = Path(__file__).resolve().parents[3] / "indicf5_tts"
-_NARRATOR_VOICE_ID = "narrator_female_warm"
+_NARRATOR_PSEUDO_NAME = "Narrator"
+_NARRATOR_VOICE_ID_BY_GENDER = {
+    "female": "female_local_samantha",
+    "male": "male_local_daniel",
+}
+_NARRATOR_VOICE_ID = _NARRATOR_VOICE_ID_BY_GENDER["female"]
 
 
 @dataclass(frozen=True)
@@ -95,11 +101,33 @@ def _ref_audio_base64(entry: VoiceLibraryEntry) -> str:
     return base64.b64encode(clip_path.read_bytes()).decode("ascii")
 
 
-def _narrator_voice(library: list[VoiceLibraryEntry]) -> VoiceLibraryEntry:
+def _narrator_voice_by_id(library: list[VoiceLibraryEntry], voice_id: str) -> VoiceLibraryEntry:
     for entry in library:
-        if entry.id == _NARRATOR_VOICE_ID:
+        if entry.id == voice_id:
             return entry
     return library[0]
+
+
+def _cast_narrator_voice(
+    *, provider: ModelProvider, model: str, scene_text: str, library: list[VoiceLibraryEntry]
+) -> VoiceLibraryEntry:
+    """Let the LLM judge the narration's tone and pick a male or female narrator voice.
+
+    Only gender is used from the archetype (age/tone are irrelevant here,
+    since only one narrator voice per gender exists) — falls back to the
+    default female narrator if the model call fails or is inconclusive,
+    same fallback posture as `voice_casting.propose_voice_archetypes`.
+    """
+
+    archetypes = propose_voice_archetypes(
+        provider=provider,
+        model=model,
+        scene_text=scene_text,
+        character_names=[_NARRATOR_PSEUDO_NAME],
+    )
+    gender = archetypes.get(_NARRATOR_PSEUDO_NAME, VoiceArchetype(name=_NARRATOR_PSEUDO_NAME, gender="female", age_group="adult", tone="")).gender
+    voice_id = _NARRATOR_VOICE_ID_BY_GENDER.get(gender, _NARRATOR_VOICE_ID)
+    return _narrator_voice_by_id(library, voice_id)
 
 
 def _resolve_reference(
@@ -122,13 +150,8 @@ def synthesize_script_audio(
     provider: ModelProvider,
     casting_model: str,
     tts: IndicF5Provider,
-    # IndicF5's diffusion step count: lower = faster, lower quality. Default
-    # dropped from 32 to 4 — on this local (non-CUDA) setup, 32 was taking
-    # 25-70+ seconds per line even for short lines, which is what was making
-    # a whole chapter take many minutes. 4 trades audio fidelity for speed,
-    # explicitly requested for now to get end-to-end generation fast enough
-    # to actually test/demo.
-    nfe_step: int = 4,
+    # IndicF5's diffusion step count: lower = faster, lower quality.
+    nfe_step: int = 32,
     voice_overrides: dict[str, UploadedVoice] | None = None,
     on_line: Callable[[CharacterAudioLine], None] | None = None,
 ) -> list[CharacterAudioLine]:
@@ -160,7 +183,9 @@ def synthesize_script_audio(
 
     overrides = voice_overrides or {}
     library = load_voice_library()
-    narrator_voice = _narrator_voice(library)
+    narrator_voice = _cast_narrator_voice(
+        provider=provider, model=casting_model, scene_text=raw_text, library=library
+    )
 
     character_names = speaking_characters(lines)
     characters_needing_cast = [name for name in character_names if name not in overrides]
