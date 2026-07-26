@@ -1,13 +1,26 @@
 #!/usr/bin/env bash
-# Starts the IndicF5 API server + an ngrok tunnel, and prints the public URL.
-# Requires: `bash setup.sh` already run once, and `ngrok config add-authtoken <token>` already done.
+# Starts the IndicF5 API server on localhost:8001.
+# Requires: `bash setup.sh` already run once.
 set -euo pipefail
 cd "$(dirname "$0")"
 
 source .venv/bin/activate
 
+# Idempotent: kill anything already bound to :8001 first. Without this, a
+# rerun starts a second uvicorn that immediately dies with "address already
+# in use" while the earlier (possibly stale/orphaned) one keeps answering
+# health checks — looking exactly like the new process got killed, when
+# really it just lost a port conflict.
+EXISTING_PIDS=$(lsof -tiTCP:8001 -sTCP:LISTEN 2>/dev/null || true)
+if [ -n "$EXISTING_PIDS" ]; then
+    echo "==> Port 8001 already in use by PID(s) $EXISTING_PIDS — stopping first"
+    kill $EXISTING_PIDS 2>/dev/null || true
+    sleep 1
+fi
+
 echo "==> Starting API server on :8001 (log: server.log)"
 nohup uvicorn api_server:app --host 0.0.0.0 --port 8001 > server.log 2>&1 &
+disown
 SERVER_PID=$!
 echo "    Server PID: $SERVER_PID"
 
@@ -20,31 +33,12 @@ for i in $(seq 1 30); do
     sleep 2
 done
 
-if ! command -v ngrok &> /dev/null; then
-    echo "ngrok not found. Install with: brew install ngrok"
-    echo "Then run: ngrok config add-authtoken <your-token>"
-    exit 1
-fi
-
-echo "==> Starting ngrok tunnel (log: ngrok.log)"
-nohup ngrok http 8001 --log stdout > ngrok.log 2>&1 &
-NGROK_PID=$!
-echo "    ngrok PID: $NGROK_PID"
-
-sleep 4
-PUBLIC_URL=$(curl -s http://localhost:4040/api/tunnels | python3 -c "import sys, json; print(json.load(sys.stdin)['tunnels'][0]['public_url'])" 2>/dev/null || echo "")
-
 echo ""
 echo "=================================================="
-if [ -n "$PUBLIC_URL" ]; then
-    echo "Public URL: $PUBLIC_URL"
-    echo "Health check: $PUBLIC_URL/health"
-else
-    echo "Could not fetch public URL automatically."
-    echo "Check manually: curl http://localhost:4040/api/tunnels"
-fi
+echo "Local URL: http://localhost:8001"
+echo "Health check: http://localhost:8001/health"
 echo "=================================================="
 echo ""
-echo "To stop: kill $SERVER_PID $NGROK_PID"
-echo "(PIDs also saved to .server.pid)"
-echo "$SERVER_PID $NGROK_PID" > .server.pid
+echo "To stop: kill $SERVER_PID"
+echo "(PID also saved to .server.pid)"
+echo "$SERVER_PID" > .server.pid

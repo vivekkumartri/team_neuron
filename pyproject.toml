@@ -48,6 +48,7 @@ run_generation_job = "story_engine.workers.generation_job:main"
 run_storyboard_job = "story_engine.workers.storyboard_job:main"
 run_report_job = "story_engine.workers.report_job:main"
 run_memory_compaction_job = "story_engine.workers.memory_compaction:main"
+run_memory_graph_index_job = "story_engine.workers.memory_graph_index:main"
 run_audit_export_job = "story_engine.analytics.export_generation_audit:main"
 
 [tool.setuptools.packages.find]

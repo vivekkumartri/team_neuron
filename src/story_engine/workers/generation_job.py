@@ -32,6 +32,8 @@ from story_engine.workers.queue import claim_job, release_job
 
 logger = logging.getLogger(__name__)
 
+MAX_EVALUATOR_ATTEMPTS = 3
+
 
 def _brief(text: str, limit: int = 500) -> str:
     """Cap a prior agent's reply before it's handed to the next agent.
@@ -312,75 +314,106 @@ def run_generation_job(job_id: UUID) -> None:
                 summary="Continuity review completed.",
             )
 
-            sequence += 1
-            _write_event(
-                connection,
-                job_id=job_id,
-                requester_id=requester_uuid,
-                sequence=sequence,
-                agent="storyteller",
-                recipient="evaluator",
-                status="GENERATING",
-                summary="Storyteller is drafting scenes and character dialogue.",
-            )
-            screenplay = _timed_complete(
-                provider,
-                job_id=job_id,
-                agent="storyteller",
-                system_prompt=storyteller_prompt_for_language(language),
-                user_data=(
-                    f"{story_context}\nCharacter perspective:\n{_brief(character)}\n"
-                    f"Director:\n{_brief(director)}\nWorld:\n{_brief(world)}"
-                ),
-                model=settings.openai_model,
-            )
-            policy = RuleBasedContentPolicy().assess(screenplay, PolicySubject.CANDIDATE_PROSE)
-            if policy.decision is not PolicyDecision.ALLOW:
-                raise RuntimeError("Candidate was blocked by content policy")
-            _write_run(
-                connection,
-                job_id=job_id,
-                requester_id=requester_uuid,
-                agent="storyteller",
-                summary="Drafted candidate chapter.",
-            )
+            # Storyteller drafts, Evaluator reviews; if rejected, retry
+            # in-loop with the rejection reason fed back to the Storyteller
+            # instead of ending the job as BLOCKED and waiting on the author
+            # to manually click Continue again. `candidate_chapters.job_id`
+            # is UNIQUE, so only the *final* attempt's result gets a row —
+            # everything before that is visible only in `generation_events`/
+            # `agent_runs`, same as any other in-progress step.
+            screenplay = ""
+            evaluator = ""
+            approved = False
+            rejection_feedback = ""
+            for attempt in range(1, MAX_EVALUATOR_ATTEMPTS + 1):
+                sequence += 1
+                _write_event(
+                    connection,
+                    job_id=job_id,
+                    requester_id=requester_uuid,
+                    sequence=sequence,
+                    agent="storyteller",
+                    recipient="evaluator",
+                    status="GENERATING",
+                    summary=(
+                        "Storyteller is drafting scenes and character dialogue."
+                        if attempt == 1
+                        else f"Storyteller is regenerating after rejection (attempt {attempt}/"
+                        f"{MAX_EVALUATOR_ATTEMPTS})."
+                    ),
+                )
+                screenplay = _timed_complete(
+                    provider,
+                    job_id=job_id,
+                    agent="storyteller",
+                    system_prompt=storyteller_prompt_for_language(language),
+                    user_data=(
+                        f"{story_context}\nCharacter perspective:\n{_brief(character)}\n"
+                        f"Director:\n{_brief(director)}\nWorld:\n{_brief(world)}"
+                        + (
+                            f"\nThe evaluator rejected your previous draft: {rejection_feedback}\n"
+                            "Revise to address this specifically."
+                            if rejection_feedback
+                            else ""
+                        )
+                    ),
+                    model=settings.openai_model,
+                )
+                policy = RuleBasedContentPolicy().assess(screenplay, PolicySubject.CANDIDATE_PROSE)
+                if policy.decision is not PolicyDecision.ALLOW:
+                    raise RuntimeError("Candidate was blocked by content policy")
+                _write_run(
+                    connection,
+                    job_id=job_id,
+                    requester_id=requester_uuid,
+                    agent="storyteller",
+                    summary="Drafted candidate chapter.",
+                )
 
-            sequence += 1
-            _write_event(
-                connection,
-                job_id=job_id,
-                requester_id=requester_uuid,
-                sequence=sequence,
-                agent="evaluator",
-                recipient="director",
-                status="EVALUATING",
-                summary="Evaluator is checking the candidate before publication.",
-            )
-            evaluator = _timed_complete(
-                provider,
-                job_id=job_id,
-                agent="evaluator",
-                system_prompt=EVALUATOR,
-                user_data=(
-                    f"{story_context}\nWorld constraints:\n{_brief(world)}"
-                    f"\nCandidate:\n{screenplay}"
-                ),
-                model=settings.openai_model,
-            )
-            if not evaluator:
-                raise RuntimeError("Evaluator returned no review")
-            approved = evaluator.lstrip().upper().startswith("APPROVE")
-            _write_run(
-                connection,
-                job_id=job_id,
-                requester_id=requester_uuid,
-                agent="evaluator",
-                summary=(
-                    "Evaluator approved candidate."
-                    if approved
-                    else "Evaluator rejected candidate and requested regeneration."
-                ),
-            )
+                sequence += 1
+                _write_event(
+                    connection,
+                    job_id=job_id,
+                    requester_id=requester_uuid,
+                    sequence=sequence,
+                    agent="evaluator",
+                    recipient="director",
+                    status="EVALUATING",
+                    summary="Evaluator is checking the candidate before publication.",
+                )
+                evaluator = _timed_complete(
+                    provider,
+                    job_id=job_id,
+                    agent="evaluator",
+                    system_prompt=EVALUATOR,
+                    user_data=(
+                        f"{story_context}\nWorld constraints:\n{_brief(world)}"
+                        f"\nCandidate:\n{screenplay}"
+                    ),
+                    model=settings.openai_model,
+                )
+                if not evaluator:
+                    raise RuntimeError("Evaluator returned no review")
+                approved = evaluator.lstrip().upper().startswith("APPROVE")
+                will_retry = not approved and attempt < MAX_EVALUATOR_ATTEMPTS
+                _write_run(
+                    connection,
+                    job_id=job_id,
+                    requester_id=requester_uuid,
+                    agent="evaluator",
+                    summary=(
+                        "Evaluator approved candidate."
+                        if approved
+                        else "Evaluator rejected candidate; regenerating automatically."
+                        if will_retry
+                        else "Evaluator rejected candidate after the maximum retries."
+                    ),
+                )
+                if approved:
+                    break
+                rejection_feedback = _brief(evaluator, limit=300)
+                if not will_retry:
+                    break
 
             with connection.cursor() as cursor:
                 cursor.execute(
@@ -426,7 +459,8 @@ def run_generation_job(job_id: UUID) -> None:
                 summary=(
                     "World committed the approved chapter to this branch."
                     if approved
-                    else "Publication was blocked; the evaluator requested regeneration."
+                    else f"Publication was blocked after {MAX_EVALUATOR_ATTEMPTS} automatic "
+                    "regeneration attempts — the evaluator rejected every candidate."
                 ),
             )
             release_job(connection, job_id, status="SUCCEEDED" if approved else "BLOCKED")

@@ -1,0 +1,23 @@
+{
+  "title": "there is 3 person in story that are playing chess on mars",
+  "tagline": "",
+  "seed_prompt": "there is 3 person in story that are playing chess on mars",
+  "language": "en",
+  "cast": [
+    {
+      "name": "\u0906\u0930\u0935 \u0938\u0947\u0928",
+      "role": "CHARACTER",
+      "traits": ""
+    },
+    {
+      "name": "\u092e\u0940\u0930\u093e \u0928\u093e\u092f\u0930",
+      "role": "CHARACTER",
+      "traits": ""
+    },
+    {
+      "name": "\u0915\u092c\u0940\u0930 \u0905\u0902\u0938\u093e\u0930\u0940",
+      "role": "CHARACTER",
+      "traits": ""
+    }
+  ]
+}

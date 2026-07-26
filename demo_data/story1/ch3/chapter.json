@@ -1,0 +1,29 @@
+{
+  "title": "Answer",
+  "text": "The moment Mira keyed the response sequence, every light in the structure came on at once — not electric light, but something colder, bluer, moving like it was thinking.\n\nORSA: Structure is responding. I am reading... a second signal. Human origin. Encrypted with a cipher this ship's registry predates.\n\nTobias Lin: Older than the Halcyon? That thing's fifteen years old.\n\nMira Okafor: Not older than the ship. Older than the cipher standard the ship uses. ORSA, when was that standard retired?\n\nORSA: Sixty-one years ago.\n\nTobias went quiet in a way that Mira had never once heard from him.\n\nTobias Lin: Someone's been down here answering this thing for sixty-one years.\n\nMira Okafor: Or something has.",
+  "narration_asset": null,
+  "storyboard": [
+    {
+      "scene_number": 1,
+      "location": "Interior of the buried structure",
+      "action": "The chamber lights up as Mira transmits the response sequence",
+      "emotion": "Tense, wonder giving way to dread",
+      "image_asset": null,
+      "dialogue": [
+        { "speaker_name": "ORSA", "line_text": "Structure is responding. I am reading... a second signal. Human origin. Encrypted with a cipher this ship's registry predates." },
+        { "speaker_name": "Tobias Lin", "line_text": "Older than the Halcyon? That thing's fifteen years old." }
+      ]
+    },
+    {
+      "scene_number": 2,
+      "location": "Interior of the buried structure",
+      "action": "Tobias realizes the implication of the cipher's age",
+      "emotion": "Quiet dread",
+      "image_asset": null,
+      "dialogue": [
+        { "speaker_name": "Tobias Lin", "line_text": "Someone's been down here answering this thing for sixty-one years." },
+        { "speaker_name": "Mira Okafor", "line_text": "Or something has." }
+      ]
+    }
+  ]
+}

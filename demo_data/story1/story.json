@@ -1,0 +1,11 @@
+{
+  "title": "The Castaway Signal",
+  "tagline": "A stranded crew decodes a message that isn't for them.",
+  "seed_prompt": "A small survey crew crash-lands on an uncharted moon and starts picking up a signal that shouldn't exist.",
+  "language": "en",
+  "cast": [
+    { "name": "Mira Okafor", "role": "Systems engineer", "traits": "Methodical, distrusts easy answers" },
+    { "name": "Tobias Lin", "role": "Pilot", "traits": "Reckless optimist, ex-smuggler" },
+    { "name": "ORSA", "role": "Ship AI", "traits": "Literal, quietly protective of the crew" }
+  ]
+}

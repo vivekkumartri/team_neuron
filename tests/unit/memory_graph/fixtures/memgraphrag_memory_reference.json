@@ -1,0 +1,30 @@
+{
+  "_comment": "Shape reference only, adapted from MemGraphRAG's Memory.py SchemaNode/FactNode/PassageNode dataclasses. Field names below are team_neuron's own (see migrations/0023_memory_graph.sql), not copied verbatim from the upstream repo.",
+  "schema_nodes": [
+    {"name": "Character", "category": "ENTITY_TYPE", "description": "A named story character."},
+    {"name": "owns", "category": "RELATION_TYPE", "description": "Possession relation."}
+  ],
+  "fact_nodes": [
+    {
+      "branch_id": "00000000-0000-0000-0000-000000000001",
+      "character_id": "00000000-0000-0000-0000-000000000002",
+      "head": "Mira",
+      "head_type": "Character",
+      "relation": "owns",
+      "relation_type": "owns",
+      "tail": "a bronze key",
+      "tail_type": "Object",
+      "status": "ACTIVE",
+      "confidence": 0.82
+    }
+  ],
+  "passage_nodes": [
+    {
+      "branch_id": "00000000-0000-0000-0000-000000000001",
+      "character_id": "00000000-0000-0000-0000-000000000002",
+      "source_chapter_id": "00000000-0000-0000-0000-000000000003",
+      "text": "Mira pocketed the bronze key before the door swung shut.",
+      "fact_ids": []
+    }
+  ]
+}

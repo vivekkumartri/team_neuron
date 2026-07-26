@@ -1,0 +1,23 @@
+{
+  "title": "a cat and a camel are living in same house",
+  "tagline": "",
+  "seed_prompt": "a cat and a camel are living in same house",
+  "language": "en",
+  "cast": [
+    {
+      "name": "\u092e\u093f\u0928\u094d\u0928\u0940",
+      "role": "CHARACTER",
+      "traits": ""
+    },
+    {
+      "name": "\u092c\u093e\u0926\u0932",
+      "role": "CHARACTER",
+      "traits": ""
+    },
+    {
+      "name": "\u091f\u0947\u0922\u093c\u093e-\u092e\u0947\u0922\u093c\u093e \u092e\u0915\u093e\u0928",
+      "role": "CHARACTER",
+      "traits": ""
+    }
+  ]
+}

@@ -15,6 +15,12 @@ class CharacterMemoryBuckets(BaseModel):
     core: tuple[str, ...] = Field(default=(), max_length=50)
     episodic: tuple[str, ...] = Field(default=(), max_length=50)
     screenplay: tuple[str, ...] = Field(default=(), max_length=50)
+    # Optional top-k fact-layer triples (memory_graph.schema.FactNode,
+    # rendered as "(head, relation, tail)" strings) for this same character
+    # on this same branch. Additive alongside `episodic`, not a replacement
+    # for it -- see docs/adr/0001-memgraphrag-adaptation.md. Bounded the
+    # same way the flat buckets already are.
+    facts: tuple[str, ...] = Field(default=(), max_length=50)
 
 
 class BranchDirectorMemory(BaseModel):

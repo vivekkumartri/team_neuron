@@ -1,6 +1,7 @@
 "use client";
 
 import { ROUTES } from "../../lib/routes";
+import { useDemoMode } from "../../lib/demo-mode";
 
 export function Sidebar({
   pathname,
@@ -9,6 +10,8 @@ export function Sidebar({
   pathname: string;
   onNavigate: (path: string) => void;
 }) {
+  const [demoMode, setDemoMode] = useDemoMode();
+
   return (
     <nav
       aria-label="Primary"
@@ -36,6 +39,23 @@ export function Sidebar({
           );
         })}
       </ul>
+
+      <div className="mt-8 border-t border-stone-800 pt-4">
+        <label className="flex items-center justify-between gap-2 text-xs text-stone-400">
+          <span>
+            Demo mode
+            <span className="mt-0.5 block text-[11px] text-stone-500">
+              Replay saved stories, no live generation
+            </span>
+          </span>
+          <input
+            type="checkbox"
+            checked={demoMode}
+            onChange={(event) => setDemoMode(event.target.checked)}
+            className="h-4 w-4 accent-violet-400"
+          />
+        </label>
+      </div>
     </nav>
   );
 }

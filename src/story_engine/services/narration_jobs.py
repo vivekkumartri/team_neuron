@@ -10,8 +10,21 @@ unrelated source change while a job is running — the most common way this
 bites in local dev) is detectable instead of silently pretending nothing
 ever happened: `get_status` finds the on-disk `GENERATING` marker with no
 matching in-memory job and reports it as `FAILED` with an explicit
-"interrupted" message, rather than quietly reverting to `NOT_STARTED` and
-making an author re-wait the same 4-5 minutes without knowing why.
+"interrupted" message (keeping whatever lines had already finished, rather
+than quietly reverting to `NOT_STARTED` and losing them.
+
+Lines are pushed out as they finish, not batched at the end: `start_job`
+passes `character_audio.synthesize_script_audio` an `on_line` callback that
+appends each ~3-4 second clip to the job (and persists it) the moment it's
+ready, while `status` stays `GENERATING`. A poller can render/play lines
+long before the whole chapter is done instead of waiting for the last line
+to know about the first one.
+
+Once every line is done, all of them (in script order — one chunk per
+character turn) are joined into a single `combined_audio_bytes` track via
+`character_audio.concatenate_wav_clips`, so a chapter is available both as
+individual per-character chunks (for the chunk-by-chunk UI) and as one
+continuous file.
 
 A finished (`READY`) job's audio is also persisted, so once narration has
 actually completed once, a later restart still serves it instantly instead
@@ -34,6 +47,7 @@ from story_engine.agents.provider import ModelProvider, ModelProviderError
 from story_engine.services.character_audio import (
     CharacterAudioError,
     CharacterAudioLine,
+    concatenate_wav_clips,
     synthesize_script_audio,
 )
 from story_engine.services.script_parser import ScriptLineKind
@@ -66,6 +80,9 @@ class NarrationJob:
     started_at: float | None = None
     lines: list[CharacterAudioLine] = field(default_factory=list)
     error: str | None = None
+    # Only set once status is READY — every line's clip joined into one
+    # continuous track, in script order.
+    combined_audio_bytes: bytes | None = None
 
 
 _jobs: dict[UUID, NarrationJob] = {}
@@ -95,6 +112,11 @@ def _persist(chapter_id: UUID, job: NarrationJob) -> None:
                 }
                 for line in job.lines
             ],
+            "combined_audio_base64": (
+                base64.b64encode(job.combined_audio_bytes).decode("ascii")
+                if job.combined_audio_bytes is not None
+                else None
+            ),
         }
         _job_path(chapter_id).write_text(json.dumps(payload), encoding="utf-8")
     except OSError:
@@ -111,27 +133,35 @@ def _load_from_disk(chapter_id: UUID) -> NarrationJob | None:
         return None
 
     status = payload.get("status")
+    lines = [
+        CharacterAudioLine(
+            scene_index=item["scene_index"],
+            kind=ScriptLineKind(item["kind"]),
+            speaker=item["speaker"],
+            text=item["text"],
+            voice_id=item["voice_id"],
+            audio_bytes=base64.b64decode(item["audio_base64"]),
+        )
+        for item in payload.get("lines", [])
+    ]
     if status == NarrationStatus.GENERATING.value:
         # A GENERATING marker with nothing live in `_jobs` means the process
         # that was running this job is gone — it never got to write a final
         # READY/FAILED result, so treat it as interrupted rather than
-        # resurrecting a job no thread is actually running anymore.
-        return NarrationJob(status=NarrationStatus.FAILED, error=_INTERRUPTED_MESSAGE)
+        # resurrecting a job no thread is actually running anymore. Whatever
+        # lines it had already pushed out before dying are kept, not thrown
+        # away — they're valid, finished audio regardless of how the job as
+        # a whole ended.
+        return NarrationJob(status=NarrationStatus.FAILED, error=_INTERRUPTED_MESSAGE, lines=lines)
     if status == NarrationStatus.READY.value:
-        lines = [
-            CharacterAudioLine(
-                scene_index=item["scene_index"],
-                kind=ScriptLineKind(item["kind"]),
-                speaker=item["speaker"],
-                text=item["text"],
-                voice_id=item["voice_id"],
-                audio_bytes=base64.b64decode(item["audio_base64"]),
-            )
-            for item in payload.get("lines", [])
-        ]
-        return NarrationJob(status=NarrationStatus.READY, lines=lines)
+        combined_b64 = payload.get("combined_audio_base64")
+        return NarrationJob(
+            status=NarrationStatus.READY,
+            lines=lines,
+            combined_audio_bytes=base64.b64decode(combined_b64) if combined_b64 else None,
+        )
     if status == NarrationStatus.FAILED.value:
-        return NarrationJob(status=NarrationStatus.FAILED, error=payload.get("error"))
+        return NarrationJob(status=NarrationStatus.FAILED, error=payload.get("error"), lines=lines)
     return None
 
 
@@ -171,26 +201,47 @@ def start_job(
         _jobs[chapter_id] = job
     _persist(chapter_id, job)
 
+    def _on_line(line: CharacterAudioLine) -> None:
+        # Mutate the same job object every poller already holds a reference
+        # to via `get_status` — a new line becomes visible the instant it's
+        # appended, not only once the whole chapter finishes.
+        with _lock:
+            job.lines.append(line)
+        _persist(chapter_id, job)
+
     def _run() -> None:
         try:
-            lines: list[CharacterAudioLine] = synthesize_script_audio(
+            synthesize_script_audio(
                 raw_text=raw_text,
                 provider=provider,
                 casting_model=casting_model,
                 tts=tts,
                 voice_overrides=voice_overrides,
+                on_line=_on_line,
             )
-            result = NarrationJob(status=NarrationStatus.READY, lines=lines)
+            # Join every line's chunk (in script order) into one continuous
+            # track now that they're all done. A join failure (e.g. a
+            # mismatched clip format) shouldn't discard otherwise-good
+            # per-line audio — the chunk-by-chunk UI still works without it
+            # — so this degrades to READY-without-a-combined-track rather
+            # than failing the whole job.
+            combined: bytes | None
+            try:
+                combined = concatenate_wav_clips([line.audio_bytes for line in job.lines])
+            except CharacterAudioError:
+                combined = None
+            with _lock:
+                job.status = NarrationStatus.READY
+                job.combined_audio_bytes = combined
         except (CharacterAudioError, VoiceCastingError, ModelProviderError) as error:
-            result = NarrationJob(status=NarrationStatus.FAILED, error=str(error))
+            with _lock:
+                job.status = NarrationStatus.FAILED
+                job.error = str(error)
         except Exception:  # noqa: BLE001 - a dead background thread must still report FAILED
-            result = NarrationJob(
-                status=NarrationStatus.FAILED,
-                error="Narration generation failed unexpectedly.",
-            )
-        with _lock:
-            _jobs[chapter_id] = result
-        _persist(chapter_id, result)
+            with _lock:
+                job.status = NarrationStatus.FAILED
+                job.error = "Narration generation failed unexpectedly."
+        _persist(chapter_id, job)
 
     threading.Thread(target=_run, daemon=True).start()
     return job

@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 
 import { ROUTES } from "../../lib/routes";
+import { useDemoMode } from "../../lib/demo-mode";
 
 export function MobileDrawer({
   open,
@@ -16,6 +17,7 @@ export function MobileDrawer({
   onClose: () => void;
 }) {
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const [demoMode, setDemoMode] = useDemoMode();
 
   useEffect(() => {
     if (open) {
@@ -76,6 +78,17 @@ export function MobileDrawer({
             );
           })}
         </ul>
+        <div className="mt-8 border-t border-stone-800 pt-4">
+          <label className="flex items-center justify-between gap-2 text-xs text-stone-400">
+            <span>Demo mode</span>
+            <input
+              type="checkbox"
+              checked={demoMode}
+              onChange={(event) => setDemoMode(event.target.checked)}
+              className="h-4 w-4 accent-violet-400"
+            />
+          </label>
+        </div>
       </nav>
     </div>
   );

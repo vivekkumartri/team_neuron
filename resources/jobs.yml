@@ -94,6 +94,39 @@ resources:
           default: ""
       max_concurrent_runs: 4
 
+    memory_graph_index_job:
+      # MemGraphRAG integration (docs/adr/0001-memgraphrag-adaptation.md):
+      # extracts fact-layer triples from fresh episodic memory and runs
+      # conflict detection (src/story_engine/workers/memory_graph_index.py).
+      # Registered the same way memory_compaction_job is; runs as a
+      # post-publication job, not inline on the request path, per this
+      # repo's async-operation convention. Two parameters because indexing
+      # needs both the branch (to scope which characters/facts) and the
+      # chapter that was just published (to stamp source_chapter_id on new
+      # fact_nodes/passage_nodes rows).
+      name: story-engine-memory-graph-index-${bundle.target}
+      environments:
+        - environment_key: serverless
+          spec:
+            environment_version: "4"
+            dependencies:
+              - ../dist/*.whl
+      tasks:
+        - task_key: run_memory_graph_index
+          environment_key: serverless
+          python_wheel_task:
+            package_name: story_engine
+            entry_point: run_memory_graph_index_job
+            named_parameters:
+              branch-id: "{{job.parameters.branch_id}}"
+              chapter-id: "{{job.parameters.chapter_id}}"
+      parameters:
+        - name: branch_id
+          default: ""
+        - name: chapter_id
+          default: ""
+      max_concurrent_runs: 4
+
     audit_export_job:
       # Task 3F.1/3F.3 gap closure: incremental redacted export to Delta
       # (src/story_engine/analytics/export_generation_audit.py). Scheduled

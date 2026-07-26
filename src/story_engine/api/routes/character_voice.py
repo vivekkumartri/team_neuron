@@ -15,6 +15,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from pydantic import BaseModel, Field
+from starlette.responses import Response
 
 from story_engine.agents.indicf5_provider import IndicF5Provider
 from story_engine.agents.provider import ModelProviderError, OpenAIResponsesProvider
@@ -68,7 +69,12 @@ class NarrationStatusResponse(BaseModel):
     status: NarrationStatus
     estimated_seconds: int | None = None
     error: str | None = None
+    # Only lines from index `since` onward (see `get_chapter_narration`'s
+    # `since` query param) — NOT necessarily every line generated so far.
+    # `total_lines` is the true count, so a poller can track its own offset
+    # without re-downloading/re-decoding every earlier clip on every poll.
     lines: list[CharacterAudioLineResponse] | None = None
+    total_lines: int = 0
 
 
 class CharacterVoiceResponse(BaseModel):
@@ -153,11 +159,24 @@ def generate_script_audio(
     return _synthesize_and_respond(body.script_text, settings, user)
 
 
-def _narration_response(job: NarrationJob) -> NarrationStatusResponse:
+def _narration_response(job: NarrationJob, *, since: int = 0) -> NarrationStatusResponse:
+    """Build a response carrying only lines from index `since` onward.
+
+    A poller that already has the first N lines re-fetching and
+    re-JSON-decoding all N of them (each one a full base64 audio clip) on
+    every 4-second tick is what actually made the UI look frozen/empty on a
+    longer chapter — a job's persisted file was already 8MB+ by line 19, and
+    that whole thing was being re-sent every poll. `since` lets a caller ask
+    for only what's new.
+    """
+
+    lines_snapshot = list(job.lines)
+    new_lines = lines_snapshot[since:]
     return NarrationStatusResponse(
         status=job.status,
         estimated_seconds=ESTIMATED_SECONDS if job.status == NarrationStatus.GENERATING else None,
         error=job.error,
+        total_lines=len(lines_snapshot),
         lines=(
             [
                 CharacterAudioLineResponse(
@@ -168,9 +187,9 @@ def _narration_response(job: NarrationJob) -> NarrationStatusResponse:
                     voice_id=line.voice_id,
                     audio_base64=base64.b64encode(line.audio_bytes).decode("ascii"),
                 )
-                for line in job.lines
+                for line in new_lines
             ]
-            if job.status == NarrationStatus.READY
+            if new_lines
             else None
         ),
     )
@@ -211,13 +230,40 @@ def start_chapter_narration(chapter_id: UUID, user: CurrentUser) -> NarrationSta
 
 
 @router.get("/chapters/{chapter_id}/narration")
-def get_chapter_narration(chapter_id: UUID, user: CurrentUser) -> NarrationStatusResponse:
-    """Poll narration status for a chapter. 404s the same way the chapter itself would."""
+def get_chapter_narration(
+    chapter_id: UUID, user: CurrentUser, since: int = 0
+) -> NarrationStatusResponse:
+    """Poll narration status for a chapter. 404s the same way the chapter itself would.
+
+    `since`: only return lines from this index onward (the poller already
+    has everything before it) — see `_narration_response`.
+    """
 
     with tenant_connection(user) as connection:
         published_chapter_text(connection, chapter_id)
 
-    return _narration_response(get_status(chapter_id))
+    return _narration_response(get_status(chapter_id), since=max(since, 0))
+
+
+@router.get("/chapters/{chapter_id}/narration/audio")
+def get_chapter_narration_audio(chapter_id: UUID, user: CurrentUser) -> Response:
+    """The whole chapter's per-character chunks joined into one continuous track.
+
+    Only available once the job is READY — a separate endpoint from the
+    per-line JSON status so a client can choose to fetch this potentially
+    large file only once, instead of it inflating every status poll.
+    """
+
+    with tenant_connection(user) as connection:
+        published_chapter_text(connection, chapter_id)
+
+    job = get_status(chapter_id)
+    if job.status != NarrationStatus.READY or job.combined_audio_bytes is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Combined narration audio isn't available for this chapter yet",
+        )
+    return Response(content=job.combined_audio_bytes, media_type="audio/wav")
 
 
 @router.get("/character-voices")

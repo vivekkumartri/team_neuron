@@ -13,6 +13,9 @@ complete audio reading of the scene, not dialogue-only.
 from __future__ import annotations
 
 import base64
+import io
+import wave
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -44,6 +47,47 @@ class CharacterAudioLine:
 
 class CharacterAudioError(RuntimeError):
     """Raised when the script has no narratable content to synthesize."""
+
+
+def concatenate_wav_clips(clips: list[bytes]) -> bytes:
+    """Join per-line WAV clips (each character's chunk, in script order) into one track.
+
+    Every clip comes from the same IndicF5 server (`agents/indicf5_provider.py`),
+    which always renders 24kHz mono 16-bit PCM WAV, so this only needs plain
+    stdlib `wave` concatenation — no resampling/mixing library required. Raises
+    `CharacterAudioError` if a clip doesn't match the first clip's format,
+    since silently concatenating mismatched PCM would produce corrupt/garbled
+    audio rather than a clear failure.
+    """
+
+    if not clips:
+        raise CharacterAudioError("No audio clips to join.")
+
+    try:
+        with wave.open(io.BytesIO(clips[0]), "rb") as first_reader:
+            params = first_reader.getparams()
+            frames: list[bytes] = [first_reader.readframes(first_reader.getnframes())]
+
+        for index, clip in enumerate(clips[1:], start=1):
+            with wave.open(io.BytesIO(clip), "rb") as reader:
+                clip_params = reader.getparams()
+                if clip_params[:3] != params[:3]:  # nchannels, sampwidth, framerate
+                    raise CharacterAudioError(
+                        f"Clip {index} has a different audio format than the first clip; "
+                        "cannot join into one track."
+                    )
+                frames.append(reader.readframes(reader.getnframes()))
+    except wave.Error as error:
+        raise CharacterAudioError(f"A clip was not valid WAV audio: {error}") from error
+
+    buffer = io.BytesIO()
+    with wave.open(buffer, "wb") as writer:
+        writer.setnchannels(params.nchannels)
+        writer.setsampwidth(params.sampwidth)
+        writer.setframerate(params.framerate)
+        for chunk in frames:
+            writer.writeframes(chunk)
+    return buffer.getvalue()
 
 
 def _ref_audio_base64(entry: VoiceLibraryEntry) -> str:
@@ -78,8 +122,15 @@ def synthesize_script_audio(
     provider: ModelProvider,
     casting_model: str,
     tts: IndicF5Provider,
-    nfe_step: int = 32,
+    # IndicF5's diffusion step count: lower = faster, lower quality. Default
+    # dropped from 32 to 4 — on this local (non-CUDA) setup, 32 was taking
+    # 25-70+ seconds per line even for short lines, which is what was making
+    # a whole chapter take many minutes. 4 trades audio fidelity for speed,
+    # explicitly requested for now to get end-to-end generation fast enough
+    # to actually test/demo.
+    nfe_step: int = 4,
     voice_overrides: dict[str, UploadedVoice] | None = None,
+    on_line: Callable[[CharacterAudioLine], None] | None = None,
 ) -> list[CharacterAudioLine]:
     """Parse `raw_text`, cast a voice per speaking character, synthesize every line.
 
@@ -88,6 +139,13 @@ def synthesize_script_audio(
     sent through the LLM auto-casting step at all — their voice is already
     decided. Every other speaking character still gets a library voice via
     `services/voice_casting.py`.
+
+    `on_line`, if given, is called synchronously right after each line's
+    clip finishes synthesizing (not batched at the end) — a whole chapter
+    can take minutes, and a caller (`services/narration_jobs.py`) uses this
+    to push each 3-4 second clip out to the client as soon as it exists,
+    instead of making an author wait for every line before hearing any of
+    them.
 
     Raises `CharacterAudioError` if the script has no lines at all.
     Individual line synthesis failures are not swallowed — a
@@ -141,15 +199,16 @@ def synthesize_script_audio(
         except ModelProviderError:
             raise
 
-        results.append(
-            CharacterAudioLine(
-                scene_index=line.scene_index,
-                kind=line.kind,
-                speaker=line.speaker,
-                text=line.text,
-                voice_id=voice_id,
-                audio_bytes=audio_bytes,
-            )
+        audio_line = CharacterAudioLine(
+            scene_index=line.scene_index,
+            kind=line.kind,
+            speaker=line.speaker,
+            text=line.text,
+            voice_id=voice_id,
+            audio_bytes=audio_bytes,
         )
+        results.append(audio_line)
+        if on_line is not None:
+            on_line(audio_line)
 
     return results

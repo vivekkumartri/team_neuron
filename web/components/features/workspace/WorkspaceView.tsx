@@ -457,8 +457,9 @@ export function WorkspaceView({ branchId }: { branchId: string }) {
         )}
         {jobId && complete && !succeeded && (
           <p className="mb-4 rounded-lg border border-rose-400/50 bg-rose-950/20 p-3 text-sm text-rose-100">
-            Generation didn&apos;t finish successfully (the evaluator rejected the candidate, or
-            the request failed/timed out). Nothing was published — try Continue again.
+            Generation didn&apos;t finish successfully. The storyteller already retried
+            automatically after each evaluator rejection, but every attempt was rejected (or the
+            request failed/timed out). Nothing was published — try Continue again.
           </p>
         )}
         {chapterLoadError && (

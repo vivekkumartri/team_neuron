@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { apiBase } from "./api-client";
+import { demoActivityEvents, isDemoJobId } from "./demo-runtime";
 
 export interface GenerationActivityEvent {
   sequence: number;
@@ -38,6 +39,25 @@ export function useGenerationStream(jobId: string | null): {
     setEvents([]);
     setComplete(false);
     if (!jobId) return;
+
+    // Demo mode: the "job" is fake (see `demo-runtime.ts`) — there is no
+    // real backend process to open an SSE connection to. Show the same
+    // brief activity feed shape the real stream would, then complete, all
+    // client-side and near-instantly, so `WorkspaceView` (reused unchanged)
+    // still visually transitions through "generating" the way it normally
+    // does instead of just teleporting to the chapter.
+    if (isDemoJobId(jobId)) {
+      setConnectionState("connecting");
+      const timer = window.setTimeout(() => {
+        setEvents(demoActivityEvents());
+        setConnectionState("open");
+        window.setTimeout(() => {
+          setComplete(true);
+          setConnectionState("closed");
+        }, 400);
+      }, 350);
+      return () => window.clearTimeout(timer);
+    }
 
     setConnectionState("connecting");
     const source = new EventSource(`${apiBase()}/generation-jobs/${jobId}/events`, {

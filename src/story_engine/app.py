@@ -19,6 +19,7 @@ from story_engine.api.routes.cast import router as cast_router
 from story_engine.api.routes.character_voice import router as character_voice_router
 from story_engine.api.routes.chapters import branch_chapters_router
 from story_engine.api.routes.chapters import router as chapters_router
+from story_engine.api.routes.demo import router as demo_router
 from story_engine.api.routes.endings import router as endings_router
 from story_engine.api.routes.events import router as events_router
 from story_engine.api.routes.narration import router as narration_router
@@ -66,6 +67,7 @@ def create_app() -> FastAPI:
         )
 
     app.include_router(stories_router)
+    app.include_router(demo_router)
     app.include_router(storyboards_router)
     app.include_router(branches_router)
     app.include_router(chapters_router)

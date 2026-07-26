@@ -7,6 +7,9 @@
  * `credentials: "include"` so the platform's session cookie rides along.
  */
 
+import { isDemoModeOn } from "./demo-mode";
+import { DemoApiError, handleDemoRequest } from "./demo-runtime";
+
 export class ApiError extends Error {
   constructor(
     public readonly status: number,
@@ -99,6 +102,25 @@ function formatErrorDetail(detail: unknown, path: string, status: number): strin
 }
 
 export async function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  // Demo mode: every onboarding/workspace call gets answered from a saved
+  // local bundle instead of the real backend — see `demo-runtime.ts` for
+  // the full covered surface. `/demo/*` itself is excluded so the demo
+  // picker and `demo-runtime.ts`'s own bundle loader can still reach the
+  // real (unauthenticated, static-file) `/api/v1/demo/*` endpoints.
+  if (isDemoModeOn() && !path.startsWith("/demo/")) {
+    try {
+      const result = await handleDemoRequest(path, options);
+      if (result !== undefined) {
+        return result as T;
+      }
+    } catch (error) {
+      if (error instanceof DemoApiError) {
+        throw new ApiError(error.status, error.message);
+      }
+      throw error;
+    }
+  }
+
   const headers: Record<string, string> = { Accept: "application/json" };
   if (options.body !== undefined) {
     headers["Content-Type"] = "application/json";

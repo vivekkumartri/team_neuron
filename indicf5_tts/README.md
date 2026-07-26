@@ -2,7 +2,7 @@
 
 Local text-to-speech via [AI4Bharat's IndicF5](https://huggingface.co/ai4bharat/IndicF5), runnable as:
 - a CLI script (`run_tts.py`)
-- a local API server (`api_server.py`) with an `ngrok` tunnel for remote callers (e.g. a Databricks app)
+- a local API server (`api_server.py`), served on `localhost:8001`
 - a Google Colab notebook (`IndicF5_Colab.ipynb`) for a real CUDA GPU
 
 Supports zero-shot voice cloning: give it any short reference audio clip + its transcript, and it
@@ -56,12 +56,6 @@ Then, one-time Hugging Face auth (the model is gated):
 2. Get a token from https://huggingface.co/settings/tokens (read access is enough).
 3. `source .venv/bin/activate && hf auth login` → paste the token.
 
-If you want the API reachable from the cloud (e.g. Databricks), also:
-```bash
-brew install ngrok
-ngrok config add-authtoken <your-token>   # free account at https://dashboard.ngrok.com/signup
-```
-
 ## Usage
 
 ### CLI
@@ -74,10 +68,10 @@ python3 run_tts.py \
   --out samples/output.wav
 ```
 
-### API server (+ public tunnel)
+### API server
 ```bash
-bash start_server.sh   # starts uvicorn on :8001 + ngrok tunnel, prints public URL
-bash stop_server.sh    # stops both
+bash start_server.sh   # starts uvicorn on :8001
+bash stop_server.sh    # stops it
 ```
 
 Or manually:
@@ -104,7 +98,7 @@ uvicorn api_server:app --host 0.0.0.0 --port 8001
   - Response: the generated `.wav` file, also saved under `outputs/`. Timing info comes back as headers:
     `X-Inference-Time-Sec`, `X-Audio-Duration-Sec`, `X-Realtime-Factor`, `X-Nfe-Step`.
 
-Example client call (e.g. from a Databricks notebook/app):
+Example client call:
 ```python
 import base64, requests
 
@@ -112,7 +106,7 @@ with open("my_voice_sample.wav", "rb") as f:
     ref_audio_b64 = base64.b64encode(f.read()).decode()
 
 resp = requests.post(
-    "https://<your-ngrok-url>/generate",
+    "http://localhost:8001/generate",
     json={
         "text": "यह टेक्स्ट बोला जाएगा।",
         "nfe_step": 8,
@@ -178,6 +172,5 @@ for each.
   scipy/torch/etc. compiled against numpy 2.x's ABI (`ValueError: numpy.dtype size changed`).
   Avoid by installing IndicF5 with `--no-deps` and only adding the extra libraries it needs
   manually (already done this way in `IndicF5_Colab.ipynb`).
-- **ngrok free tier gives a new random URL every restart** — if the Databricks app needs a stable
-  URL, either get a paid ngrok static domain or update the app's config each time you restart the
-  tunnel.
+- This server is local-only (`http://localhost:8001`), matching `INDICF5_BASE_URL` in the repo
+  root `.env`. Exposing it beyond localhost (e.g. for a remote caller) isn't set up here.
