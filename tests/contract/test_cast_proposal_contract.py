@@ -16,6 +16,7 @@ from uuid import uuid4
 import pytest
 from fastapi.testclient import TestClient
 
+from story_engine.agents.provider import ModelProviderError
 from story_engine.api.auth import AuthenticatedUser, authenticate_request
 from story_engine.api.settings import RuntimeSettings
 from story_engine.app import create_app
@@ -98,6 +99,7 @@ def test_cast_proposal_returns_llm_generated_cast_when_allowed(monkeypatch) -> N
     assert len(body["characters"]) == 2
     assert body["characters"][0]["name"] == "Kaelen"
     assert "Protagonist" in body["characters"][0]["role"]
+    assert body["source"] == "llm"
     # No hidden/secret field is ever present (task.md 0.4 — the prototype's
     # blurred hidden-characteristic row is explicitly not ported).
     assert "hidden" not in body["characters"][0]
@@ -112,3 +114,29 @@ def test_cast_proposal_returns_503_when_llm_not_configured(monkeypatch) -> None:
         "/api/v1/stories/cast-proposal", json={"seed": "A lighthouse keeper.", "language": "en"}
     )
     assert response.status_code == 503
+
+
+def test_cast_proposal_returns_seed_fallback_when_provider_fails(monkeypatch) -> None:
+    class _FailingProvider:
+        def __init__(self, *, api_key: str) -> None:
+            assert api_key == "test-key"
+
+        def complete(self, *, system_prompt: str, user_data: str, model: str) -> str:
+            del system_prompt, user_data, model
+            raise ModelProviderError("provider unavailable")
+
+    monkeypatch.setattr(
+        "story_engine.api.routes.stories.load_settings",
+        lambda: RuntimeSettings(openai_api_key="test-key"),
+    )
+    monkeypatch.setattr("story_engine.api.routes.stories.OpenAIResponsesProvider", _FailingProvider)
+
+    response = client.post(
+        "/api/v1/stories/cast-proposal",
+        json={"seed": "i am on moon with my 2 friends rahul and teja", "language": "hi"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["source"] == "seed_fallback"
+    assert [character["name"] for character in body["characters"]] == ["You", "Rahul", "Teja"]

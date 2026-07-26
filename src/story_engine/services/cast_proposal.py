@@ -38,6 +38,22 @@ from story_engine.security.prompt_safety import delimit_untrusted_text
 _MIN_CHARACTERS = 1
 _MAX_CHARACTERS = 6
 _TARGET_CHARACTERS_HINT = "2 to 4"
+_PROTAGONIST_ROLE_MARKERS = (
+    "protagonist",
+    "hero",
+    "heroine",
+    "lead",
+    "main character",
+    "central character",
+    "नायक",
+    "नायिका",
+    "मुख्य पात्र",
+    "मुख्य चरित्र",
+    "ప్రధాన పాత్ర",
+    "కథానాయకుడు",
+    "కథానాయకి",
+    "హీరో",
+)
 
 _CAST_PROPOSAL_SYSTEM_PROMPT = (
     "CastProposal v1: Given a short story seed, propose between 2 and 4 starting "
@@ -78,6 +94,19 @@ def _strip_code_fences(raw: str) -> str:
     return text.strip()
 
 
+def _extract_json_array(raw: str) -> str:
+    """Accept a JSON array even if a model prepends a short explanation.
+
+    The model is instructed to return only JSON, but this defensive boundary
+    avoids discarding an otherwise valid proposal solely because a provider
+    added a Markdown fence or one introductory sentence.
+    """
+
+    cleaned = _strip_code_fences(raw)
+    start, end = cleaned.find("["), cleaned.rfind("]")
+    return cleaned[start : end + 1] if start >= 0 and end > start else cleaned
+
+
 def parse_and_validate_cast_proposal(raw_output: str) -> list[CastCharacterProposal]:
     """Defensively parse and bound the LLM's raw text into a safe cast list.
 
@@ -89,7 +118,7 @@ def parse_and_validate_cast_proposal(raw_output: str) -> list[CastCharacterPropo
     shape, since truncation of a wrong shape would hide the real problem).
     """
 
-    cleaned = _strip_code_fences(raw_output)
+    cleaned = _extract_json_array(raw_output)
     try:
         parsed: Any = json.loads(cleaned)
     except json.JSONDecodeError as error:
@@ -118,13 +147,67 @@ def parse_and_validate_cast_proposal(raw_output: str) -> list[CastCharacterPropo
         except ValidationError as error:
             raise CastProposalError(f"Character {index} had an invalid shape: {error}") from error
 
-    first_role = characters[0].role.lower()
-    if "protagonist" not in first_role and "hero" not in first_role and "lead" not in first_role:
-        raise CastProposalError(
-            "The first proposed character must be clearly flagged as the protagonist."
+    # The system prompt instructs the model to put the protagonist first and
+    # to say so in that character's `role`. Real models don't always phrase
+    # this exactly the way `_PROTAGONIST_ROLE_MARKERS` expects (e.g. "Main
+    # character" in English, or any phrasing in a language we haven't added
+    # a marker for yet) — and downstream code (`cast.py`'s `lock_cast`)
+    # already treats the *first* character in the list as the protagonist
+    # positionally, regardless of what its role string says. So rather than
+    # hard-rejecting an otherwise-good proposal over word choice, we
+    # auto-label it: if no known marker is present, prefix the role with
+    # "Protagonist · " so the author sees an accurate, visible label without
+    # ever losing a valid cast to a wording mismatch.
+    first_role = characters[0].role.casefold()
+    if not any(marker in first_role for marker in _PROTAGONIST_ROLE_MARKERS):
+        characters[0] = characters[0].model_copy(
+            update={"role": f"Protagonist · {characters[0].role}"}
         )
 
     return characters
+
+
+def fallback_cast_from_seed(seed: str) -> list[CastCharacterProposal]:
+    """Create an editable, seed-grounded cast when the provider is unavailable.
+
+    This is deliberately a graceful-degradation path, not a replacement for
+    the LLM proposal: it identifies names mentioned after "friend(s)" and
+    gives the author a usable cast screen instead of blocking story creation.
+    """
+
+    normalized = seed.strip()
+    companions: list[str] = []
+    friend_match = re.search(r"\bfriends?\b\s*(?:named|are|:)?\s*(.+)", normalized, re.I)
+    if friend_match:
+        stop_words = {"and", "with", "my", "two", "three", "friend", "friends", "on", "the", "moon"}
+        for token in re.findall(r"[A-Za-z][A-Za-z'-]{1,}", friend_match.group(1)):
+            candidate = token.title()
+            if token.lower() not in stop_words and candidate not in companions:
+                companions.append(candidate)
+            if len(companions) == 3:
+                break
+
+    setting = "lunar" if re.search(r"\bmoon|lunar\b", normalized, re.I) else "story"
+    cast = [
+        CastCharacterProposal(
+            name="You",
+            role=f"Protagonist · {setting.title()} explorer",
+            voice="Direct, observant, and determined",
+            traits="curious, resilient, loyal",
+            visual="practical expedition gear",
+        )
+    ]
+    cast.extend(
+        CastCharacterProposal(
+            name=name,
+            role="Starting companion",
+            voice="Warm and supportive",
+            traits="resourceful, loyal, adaptable",
+            visual="expedition gear suited to the journey",
+        )
+        for name in companions
+    )
+    return cast
 
 
 def propose_cast(

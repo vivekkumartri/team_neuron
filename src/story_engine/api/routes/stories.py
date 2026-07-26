@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Annotated, cast
 from uuid import UUID
 
@@ -17,11 +18,13 @@ from story_engine.security.content_policy import RuleBasedContentPolicy
 from story_engine.services.cast_proposal import (
     CastCharacterProposal,
     CastProposalError,
+    fallback_cast_from_seed,
     propose_cast,
 )
 
 router = APIRouter(prefix="/api/v1/stories", tags=["stories"])
 CurrentUser = Annotated[AuthenticatedUser, Depends(authenticate_request)]
+logger = logging.getLogger(__name__)
 
 
 class CastMemberInput(BaseModel):
@@ -54,6 +57,7 @@ class CastProposalInput(BaseModel):
 
 class CastProposalResponse(BaseModel):
     characters: list[CastCharacterProposal]
+    source: str
 
 
 class StoryInput(BaseModel):
@@ -146,11 +150,12 @@ def create_cast_proposal(payload: CastProposalInput, user: CurrentUser) -> CastP
             language=payload.language,
         )
     except (CastProposalError, ModelProviderError) as error:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Could not generate a character proposal. Please try again.",
-        ) from error
-    return CastProposalResponse(characters=characters)
+        logger.warning("LLM cast proposal unavailable: %s", error)
+        return CastProposalResponse(
+            characters=fallback_cast_from_seed(payload.seed),
+            source="seed_fallback",
+        )
+    return CastProposalResponse(characters=characters, source="llm")
 
 
 @router.post("", response_model=StoryResponse, status_code=status.HTTP_201_CREATED)

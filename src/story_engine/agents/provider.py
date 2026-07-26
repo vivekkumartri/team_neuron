@@ -16,6 +16,55 @@ class ModelProviderError(RuntimeError):
     """Safe error surfaced when a model provider is unavailable or rejects a request."""
 
 
+def _openai_error_summary(error: HTTPError) -> str:
+    """Return a log-safe classification without exposing an upstream message."""
+
+    error_type = "unknown"
+    error_code = "unknown"
+    try:
+        payload = json.loads(error.read().decode("utf-8"))
+        detail = payload.get("error", {})
+        if isinstance(detail, dict):
+            error_type = str(detail.get("type") or error_type)
+            error_code = str(detail.get("code") or error_code)
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        pass
+    return f"status={error.code}, type={error_type}, code={error_code}"
+
+
+def _extract_response_text(body: dict[str, object]) -> str:
+    """Extract all generated text from a raw Responses API JSON payload.
+
+    ``output_text`` is an SDK convenience property, not a guaranteed field in
+    the REST JSON response. The API returns an ``output`` array that can also
+    contain reasoning and tool-call items, so inspect every message/content
+    pair rather than assuming the first item is text.
+    """
+
+    convenience_text = body.get("output_text")
+    if isinstance(convenience_text, str) and convenience_text.strip():
+        return convenience_text.strip()
+
+    output = body.get("output")
+    if not isinstance(output, list):
+        return ""
+
+    text_parts: list[str] = []
+    for item in output:
+        if not isinstance(item, dict) or item.get("type") != "message":
+            continue
+        content = item.get("content")
+        if not isinstance(content, list):
+            continue
+        for part in content:
+            if not isinstance(part, dict) or part.get("type") != "output_text":
+                continue
+            text = part.get("text")
+            if isinstance(text, str) and text.strip():
+                text_parts.append(text.strip())
+    return "\n".join(text_parts)
+
+
 class OpenAIResponsesProvider:
     """Synchronous, server-only OpenAI Responses API adapter.
 
@@ -51,15 +100,18 @@ class OpenAIResponsesProvider:
             with urlopen(request, timeout=self._timeout_seconds) as response:  # noqa: S310
                 body = json.loads(response.read().decode("utf-8"))
         except HTTPError as error:
-            raise ModelProviderError(f"OpenAI request failed with status {error.code}") from error
+            summary = _openai_error_summary(error)
+            raise ModelProviderError(f"OpenAI request failed ({summary})") from error
         except URLError as error:
             raise ModelProviderError("OpenAI is unreachable") from error
         except TimeoutError as error:
             raise ModelProviderError("OpenAI request timed out") from error
+        except OSError as error:
+            raise ModelProviderError("OpenAI connection failed") from error
         except json.JSONDecodeError as error:
             raise ModelProviderError("OpenAI returned an invalid response") from error
 
-        output_text = body.get("output_text")
-        if not isinstance(output_text, str) or not output_text.strip():
+        output_text = _extract_response_text(body)
+        if not output_text:
             raise ModelProviderError("OpenAI returned no text output")
-        return output_text.strip()
+        return output_text

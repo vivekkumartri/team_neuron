@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+from io import BytesIO
 from unittest.mock import MagicMock
+from urllib.error import HTTPError
 
 import pytest
 
@@ -42,6 +44,34 @@ def test_openai_responses_provider_sends_instructions_and_returns_output(
     }
 
 
+def test_openai_responses_provider_extracts_text_from_raw_output_items(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "story_engine.agents.provider.urlopen",
+        lambda *_args, **_kwargs: _Response(
+            {
+                "output": [
+                    {"type": "reasoning", "summary": []},
+                    {
+                        "type": "message",
+                        "role": "assistant",
+                        "content": [
+                            {"type": "output_text", "text": "First part."},
+                            {"type": "output_text", "text": "Second part."},
+                        ],
+                    },
+                ]
+            }
+        ),
+    )
+    provider = OpenAIResponsesProvider(api_key="test-key")
+
+    result = provider.complete(system_prompt="trusted", user_data="untrusted", model="test-model")
+
+    assert result == "First part.\nSecond part."
+
+
 def test_openai_responses_provider_fails_closed_for_missing_output(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -51,4 +81,24 @@ def test_openai_responses_provider_fails_closed_for_missing_output(
     provider = OpenAIResponsesProvider(api_key="test-key")
 
     with pytest.raises(ModelProviderError, match="no text output"):
+        provider.complete(system_prompt="trusted", user_data="untrusted", model="test-model")
+
+
+def test_openai_responses_provider_reports_safe_http_error_category(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    error = HTTPError(
+        "https://api.openai.com/v1/responses",
+        404,
+        "Not Found",
+        {},
+        BytesIO(b'{"error":{"type":"invalid_request_error","code":"model_not_found"}}'),
+    )
+    monkeypatch.setattr("story_engine.agents.provider.urlopen", MagicMock(side_effect=error))
+    provider = OpenAIResponsesProvider(api_key="test-key")
+
+    with pytest.raises(
+        ModelProviderError,
+        match=r"status=404, type=invalid_request_error, code=model_not_found",
+    ):
         provider.complete(system_prompt="trusted", user_data="untrusted", model="test-model")

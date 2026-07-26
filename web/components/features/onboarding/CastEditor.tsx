@@ -16,6 +16,7 @@ export interface CastCharacter {
 
 interface CastProposalResponse {
   characters: Omit<CastCharacter, "is_protagonist">[];
+  source: "llm" | "seed_fallback";
 }
 
 const blankCharacter = (isProtagonist = false): CastCharacter => ({
@@ -39,6 +40,7 @@ export function CastEditor({
   const [cast, setCast] = useState<CastCharacter[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [usingFallback, setUsingFallback] = useState(false);
 
   const generate = useCallback(async () => {
     setLoading(true);
@@ -54,9 +56,11 @@ export function CastEditor({
           is_protagonist: index === 0,
         })),
       );
+      setUsingFallback(proposal.source === "seed_fallback");
     } catch {
       setError("We couldn't generate a cast just now. You can try again or build it yourself.");
       setCast((current) => (current.length ? current : [blankCharacter(true)]));
+      setUsingFallback(true);
     } finally {
       setLoading(false);
     }
@@ -104,6 +108,12 @@ export function CastEditor({
       </div>
 
       {error && <p role="alert" className="text-sm text-rose-300">{error}</p>}
+      {usingFallback && !error && (
+        <p role="status" className="rounded-lg border border-amber-300/50 bg-amber-950/20 p-3 text-sm text-amber-100">
+          We used the names and setting in your idea to draft this editable cast. You can refine
+          every field or regenerate it when the model is available.
+        </p>
+      )}
 
       <div className="grid gap-4 md:grid-cols-2">
         {cast.map((character, index) => (
